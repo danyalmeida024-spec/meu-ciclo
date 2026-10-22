@@ -10,7 +10,7 @@ applyTheme();
 
 // ---------- estado ----------
 const KEY = 'ciclo.v1';
-const DEF = { logs: {}, settings: { cycle: 28, period: 5, luteal: 14, pregnancy: null, checklist: {} } };
+const DEF = { logs: {}, settings: { cycle: 28, period: 5, luteal: 14, pregnancy: null, checklist: {}, goal: 'track', conceiveSince: null } };
 const norm = x => ({ logs: x.logs || {}, settings: { ...DEF.settings, ...x.settings }, savedAt: x.savedAt || 0 });
 let S = load();
 function load() {
@@ -320,9 +320,90 @@ function cycleStrip(A, last, F, f, day) {
   <div class="lg"><span><i class="p"></i>Menstruação</span><span><i class="f"></i>Fértil</span><span><i class="o"></i>Ovulação</span><span><i class="w"></i>Previsão</span></div>`;
 }
 
+const goalOf = () => S.settings.pregnancy ? 'pregnant' : (S.settings.goal || 'track');
+function goalSeg() {
+  const g = goalOf();
+  return `<div class="goal" role="tablist" aria-label="Meu objetivo">${[['track', 'Monitorar'], ['conceive', 'Engravidar'], ['pregnant', 'Gestação']].map(([v, l]) => `<button role="tab" aria-selected="${g === v}" class="${g === v ? 'on' : ''}" data-act="goal" data-v="${v}">${l}</button>`).join('')}</div>`;
+}
+function ovMedianDay(A, cur) {
+  const a = A.ovSamples.filter(([od]) => od >= cur - 1).sort((x, y) => x[0] - y[0]), tot = a.reduce((t, x) => t + x[1], 0);
+  let c = 0; for (const [v, w] of a) { c += w; if (c >= tot / 2) return v; }
+  return null;
+}
+// tudo o que o modo "engravidar" precisa saber do ciclo atual
+function conceiveInfo(A) {
+  const last = A.g.at(-1), day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), e = ovEst(last.start, TODAY), beyond = TODAY > F.to;
+  let ov = null, src = null;
+  if (e) { ov = e.date; src = e.level; }
+  else if (isRegular(A)) { ov = add(add(last.start, A.cycle), -A.luteal); src = 'estimada'; }
+  else if (!beyond) { const m = ovMedianDay(A, day); if (m !== null) { ov = add(last.start, m - 1); src = 'estimada'; } }
+  const win = ov ? [add(ov, -5), add(ov, 1)] : null, best = ov ? [add(ov, -2), ov] : null;
+  const ph = phaseOf(TODAY, A), testDate = F.level ? F.center : F.from;
+  let st;
+  if (beyond) st = 'late';
+  else if (ph === 'menstrual') st = 'mens';
+  else if (!win) st = 'unknown';
+  else if (e?.level === 'iminente' || (TODAY >= best[0] && TODAY <= best[1])) st = 'best';
+  else if (TODAY < win[0]) st = 'before';
+  else if (TODAY <= win[1]) st = 'fertile';
+  else st = 'wait';
+  let tries = 0;
+  if (win) for (let d = win[0]; d <= win[1]; d = add(d, 1)) if (S.logs[d]?.sex && S.logs[d].sex !== 'Não') tries++;
+  return { last, day, F, f, e, beyond, ov, src, win, best, testDate, st, tries, ph };
+}
+
+function vHojeConceive(A, last) {
+  const c = conceiveInfo(A), { day, F, f, win, best, ov, src, testDate, st, tries } = c, pc = pregCheck(A);
+  const over = diff(TODAY, F.to), tdays = diff(testDate, TODAY), L = S.logs[TODAY] || {};
+  const toWin = win ? diff(win[0], TODAY) : null;
+  const H = {
+    best: ['fert', 'Hoje é dia de tentar', `Chance ${(f?.level || 'alta').toLowerCase()}${ov ? ' · ovulação ' + sd(ov) : ''}`, 'Tenham relações hoje e amanhã: o óvulo vive cerca de 24 h.'],
+    fertile: ['fert', 'Janela fértil aberta', `Melhores dias ${best ? sr(best[0], best[1]) : ''}`, 'Relações a cada 1–2 dias na janela dão a melhor chance.'],
+    before: ['fol', `Janela fértil em ${toWin} dia${toWin > 1 ? 's' : ''}`, win ? `${sr(win[0], win[1])} · ${src}` : '', 'Comece o teste de LH 3–5 dias antes da janela.'],
+    mens: ['mens', win ? `Janela fértil em ${Math.max(toWin, 0)}d` : 'Novo ciclo', `Menstruação · dia ${day}`, 'Registre o fluxo. O teste de LH começa perto da janela.'],
+    wait: ['lut', 'Fase de espera', `Teste de gravidez ${sd(testDate)}${tdays > 0 ? ` · em ${tdays}d` : ''}`, 'Testar antes da data pode dar falso negativo.'],
+    late: ['late', 'Faça o teste de gravidez', pc?.hasNeg ? `Negativo em ${sd(pc.lastNeg)} · ${over}d de atraso` : `${over} dia${over > 1 ? 's' : ''} de atraso`, 'Use a primeira urina do dia e registre o resultado.'],
+    unknown: ['fol', 'Descubra sua ovulação', 'Use o teste de LH todos os dias', 'O teste de LH mostra quando você ovula.']
+  }[st];
+  const R = 44, C = 2 * Math.PI * R, pct = Math.min(day / Math.max(A.hi, day), 1);
+  const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
+  const tq = L.test === 'Positivo' ? 'pos' : L.test === 'Negativo' ? 'neg' : '';
+  const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não'], ['test', tq === 'pos' ? '➕' : tq === 'neg' ? '➖' : '🧾', tq === 'pos' ? 'Positivo' : tq === 'neg' ? 'Negativo' : 'Teste', !!tq]]
+    .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
+  INFO = {
+    c_win: ['Janela fértil', `<p>${win ? `Janela: <b>${sr(win[0], win[1])}</b> (${src}). Melhores dias: <b>${sr(best[0], best[1])}</b>.` : 'Ainda não consigo estimar a janela.'}</p><p>Os 5 dias antes da ovulação e o dia dela são férteis; os 2 dias antes e o dia da ovulação são os melhores. Com teste de LH e muco registrados, a janela fica certeira.</p>`],
+    c_chance: ['Chance hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p>`],
+    c_test: ['Teste de gravidez', `<p>Faça a partir de <b>${fmt(testDate)}</b> (primeira urina do dia). Antes disso pode dar falso negativo.</p>${pc?.hasNeg ? `<p>${pc.line}</p>` : ''}`],
+    c_tries: ['Tentativas', `<p><b>${tries}</b> relação(ões) dentro da janela fértil deste ciclo.</p><p>O ideal é a cada 1–2 dias durante a janela.</p>`]
+  };
+  const since = S.settings.conceiveSince ? A.g.filter(g => g.start >= S.settings.conceiveSince).length : 0;
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  <button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
+  ${goalSeg()}
+  <section class="hh st-${H[0]}">
+    <div class="goalpill">🌱 Modo engravidar${since ? ` · ciclo ${since}` : ''}</div>
+    <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
+    <div class="ht"><h2>${H[1]}</h2><p>${H[2]}</p></div></div>
+    ${cycleStrip(A, last, F, f, day)}
+  </section>
+  <div class="tiles4">
+    <button class="tile" data-act="info" data-k="c_win"><small>Janela fértil</small><b>${win ? sr(win[0], win[1]) : '—'}</b><em>${src || 'sem estimativa'}</em></button>
+    <button class="tile" data-act="info" data-k="c_win"><small>Melhores dias</small><b>${best ? sr(best[0], best[1]) : '—'}</b><em>${ov ? 'ovulação ' + sd(ov) : ''}</em></button>
+    <button class="tile" data-act="info" data-k="c_chance"><small>Chance hoje</small><b style="color:${col}">${f ? f.level : '—'}</b><em>${f?.p != null ? Math.round(f.p * 100) + '% dos ciclos' : f?.ev ? 'ovulação ' + f.level2 : ''}</em></button>
+    <button class="tile" data-act="info" data-k="c_test"><small>Teste de gravidez</small><b>${st === 'late' ? 'Agora' : sd(testDate)}</b><em>${st === 'late' ? 'ciclo atrasado' : tdays > 0 ? `em ${tdays} dias` : 'já pode'}</em></button>
+  </div>
+  <button class="wide" data-act="info" data-k="c_tries"><span>Tentativas na janela</span><b>${tries}</b></button>
+  <p class="tip">💡 ${H[3]}</p>
+  <h2 class="sec2">Registrar hoje</h2>
+  <div class="qrow q5">${quick}<button class="qk more" data-act="log" data-d="${TODAY}"><span>＋</span>Mais</button></div>
+  ${pregBanner()}
+  <p class="fine">Estimativas · confirme com teste de LH e orientação médica</p>`;
+}
+
 function vHoje() {
   const A = analyze(), last = A.g.at(-1);
   if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Registre o <b>primeiro dia da última menstruação</b> (ou importe seu histórico em Ajustes).</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
+  if (goalOf() === 'conceive') return vHojeConceive(A, last);
   const day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), pc = pregCheck(A), ph = phaseOf(TODAY, A);
   const beyond = TODAY > F.to, over = diff(TODAY, F.to), tdays = diff(F.center, TODAY);
   const prec = F.confirmed ? 3 : F.level ? 2 : A.n >= 3 ? 2 : 1, precTxt = ['', 'Baixa', 'Média', 'Alta'][prec];
@@ -350,7 +431,7 @@ function vHoje() {
   const dk = isDark();
   return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${pregBanner()}${pos}${banner}
+  ${goalSeg()}${pregBanner()}${pos}${banner}
   <section class="hh st-${st}">
     <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
     <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -371,12 +452,14 @@ function vHoje() {
 function vCal() {
   const A = analyze(), K = marks(A);
   const first = new Date(cal.y, cal.m, 1, 12), n = new Date(cal.y, cal.m + 1, 0).getDate();
+  const best = new Set();
+  if (goalOf() === 'conceive') K.ov.forEach(o => { for (let k = -2; k <= 0; k++) best.add(add(o, k)); });
   let cells = '<div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>';
   for (let i = 0; i < first.getDay(); i++) cells += '<div class="d out"></div>';
   for (let d = 1; d <= n; d++) {
     const s = iso(new Date(cal.y, cal.m, d, 12));
     const L = S.logs[s] || {};
-    const c = ['d', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', s === TODAY ? 'today' : ''].join(' ');
+    const c = ['d', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
     const heart = L.sex && L.sex !== 'Não' ? '<b>♥</b>' : '';
     const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex') ? '<i></i>' : '';
     cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}<span class="mk">${heart}${dot}</span></button>`;
@@ -476,9 +559,16 @@ function vCfg() {
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>`;
 }
 
+function updateNav() {
+  const g = goalOf(), eng = document.querySelector('[data-tab=eng]'), gest = document.querySelector('[data-tab=gest]');
+  if (eng) { eng.hidden = g !== 'conceive'; const sp = eng.querySelector('span'); if (sp) sp.textContent = 'Plano'; }
+  if (gest) gest.hidden = g !== 'pregnant';
+}
 function render() {
+  if ((view === 'eng' && goalOf() !== 'conceive') || (view === 'gest' && goalOf() !== 'pregnant')) view = 'hoje';
   $main.innerHTML = { hoje: vHoje, cal: vCal, eng: vEng, gest: vGest, ana: vAna, cfg: vCfg, guia: vGuia }[view]();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view));
+  updateNav();
   if (view === 'gest') mount3d();
 }
 
@@ -813,7 +903,7 @@ function doImport(txt) {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.go) { view = t.dataset.go; gv = null; render(); scrollTo(0, 0); return; }
+  if (t.dataset.go) { view = t.dataset.go; gv = null; if (view === 'gest') { S.settings.goal = 'pregnant'; save(); } render(); scrollTo(0, 0); return; }
   if (t.dataset.tab) { view = t.dataset.tab; gv = null; render(); scrollTo(0, 0); return; }
   const chip = t.closest('.chip') && t;
   if (chip) {
@@ -830,9 +920,9 @@ document.addEventListener('click', e => {
       const dpp = document.getElementById('dpp').value, dum = document.getElementById('dum').value;
       const d = dpp ? add(dpp, -280) : dum;
       if (!d) { notify('Informe a DUM ou a DPP.'); break; }
-      S.settings.pregnancy = { dum: d }; save(); render(); break;
+      S.settings.pregnancy = { dum: d }; S.settings.goal = 'pregnant'; save(); render(); break;
     }
-    case 'endpreg': ask('Encerrar o acompanhamento da gestação?', 'Encerrar', () => { S.settings.pregnancy = null; save(); render(); }); break;
+    case 'endpreg': ask('Encerrar o acompanhamento da gestação?', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
     case 'info': {
       const [title, html] = INFO[t.dataset.k];
@@ -846,8 +936,16 @@ document.addEventListener('click', e => {
       else if (k === 'lh') { if (Lg.lh === 'Positivo') delete Lg.lh; else Lg.lh = 'Positivo'; }
       else if (k === 'pain') { const x = new Set(Lg.symptoms || []); if (x.has('Dor na ovulação')) x.delete('Dor na ovulação'); else x.add('Dor na ovulação'); if (x.size) Lg.symptoms = [...x]; else delete Lg.symptoms; }
       else if (k === 'sex') { if (Lg.sex && Lg.sex !== 'Não') delete Lg.sex; else Lg.sex = 'Sim'; }
+      else if (k === 'test') { if (!Lg.test) Lg.test = 'Negativo'; else if (Lg.test === 'Negativo') Lg.test = 'Positivo'; else delete Lg.test; }
       if (!Object.keys(Lg).length) delete S.logs[TODAY];
       const y = scrollY; save(); render(); scrollTo(0, y); break;
+    }
+    case 'goal': {
+      const v = t.dataset.v;
+      if (v === 'conceive') { S.settings.goal = 'conceive'; if (!S.settings.conceiveSince) S.settings.conceiveSince = TODAY; view = 'hoje'; }
+      else if (v === 'track') { S.settings.goal = 'track'; view = 'hoje'; }
+      else { S.settings.goal = 'pregnant'; view = 'gest'; }
+      save(); render(); scrollTo(0, 0); break;
     }
     case 'close': $sheet.close(); break;
     case 'prev': cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); break;
