@@ -1,4 +1,13 @@
 'use strict';
+// ---------- tema (claro / noturno) ----------
+const THEME_KEY = 'ciclo.theme';
+function applyTheme() {
+  let t = null; try { t = localStorage.getItem(THEME_KEY); } catch {}
+  if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+}
+const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+applyTheme();
+
 // ---------- estado ----------
 const KEY = 'ciclo.v1';
 const DEF = { logs: {}, settings: { cycle: 28, period: 5, luteal: 14, pregnancy: null, checklist: {} } };
@@ -295,7 +304,9 @@ function vHoje() {
   const negCard = pc?.hasNeg ? `<div class="card"><h2>Atraso com teste negativo</h2><p style="margin:0 0 8px">Teste negativo em <b>${fmt(pc.lastNeg)}</b> (${diff(TODAY, pc.lastNeg)} dias atrás). Seu ciclo está ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}); com teste negativo, as causas mais comuns são ovulação tardia, estresse, tireoide ou SOP.</p><p style="margin:0 0 8px" class="mute small">${pc.line}</p><p style="margin:0" class="mute small">Se a menstruação não vier até ${fmt(add(last.start, 90))} (3 meses sem menstruar), ou se houver dor forte ou sangramento intenso, procure seu ginecologista.</p></div>` : '';
   const alert = beyond && !S.settings.pregnancy ? (pc?.hasNeg ? negCard : redCard) : '';
   const pos = Object.entries(S.logs).filter(([d, l]) => l.test === 'Positivo' && diff(TODAY, d) <= 14).length && !S.settings.pregnancy ? `<div class="card" style="background:var(--green-l)"><b>Teste positivo registrado.</b> <button class="chip" data-go="gest">Iniciar acompanhamento</button></div>` : '';
-  return `<h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  const dk = isDark();
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
   ${pregBanner()}${pos}${alert}
   <div class="card hero">
     <div class="ring"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--pink-l)" stroke-width="14"/><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--pink)" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}"/></svg>
@@ -778,6 +789,7 @@ document.addEventListener('click', e => {
       $sheet.innerHTML = `<h1>${title}</h1>${html}<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>`;
       $sheet.showModal(); break;
     }
+    case 'theme': { try { localStorage.setItem(THEME_KEY, isDark() ? 'light' : 'dark'); } catch {} applyTheme(); render(); break; }
     case 'close': $sheet.close(); break;
     case 'prev': cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); break;
     case 'next': cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); break;
