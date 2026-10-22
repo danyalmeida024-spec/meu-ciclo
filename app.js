@@ -84,6 +84,9 @@ const add = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return iso(d
 const diff = (a, b) => Math.round((D(a) - D(b)) / 864e5);
 const TODAY = iso(new Date());
 const fmt = (s, o = { day: 'numeric', month: 'short' }) => D(s).toLocaleDateString('pt-BR', o);
+const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const sd = s => `${D(s).getDate()} ${MES[D(s).getMonth()]}`;
+const sr = (a, b) => { const x = D(a), y = D(b); return a === b ? sd(a) : x.getMonth() === y.getMonth() ? `${x.getDate()}–${y.getDate()} ${MES[y.getMonth()]}` : `${sd(a)} – ${sd(b)}`; };
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -247,20 +250,35 @@ function fertility(A) {
   const mucus = FERT_MUC.includes(S.logs[TODAY]?.mucus) || FERT_MUC.includes(S.logs[add(TODAY, -1)]?.mucus);
   if (e) {
     const o = e.date, d = diff(o, TODAY), src = e.src.join(' + '), base = { ov: o, ev: true, level2: e.level, conf: e.level === 'confirmada' };
-    if (e.level === 'iminente') return { ...base, level: 'Muito alta', txt: `Muco fértil registrado: a ovulação deve ocorrer em até 2 dias — faça o teste de LH hoje` };
+    if (e.level === 'iminente') return { ...base, level: 'Muito alta', txt: 'Muco fértil: ovulação em até 2 dias. Faça o teste de LH' };
     const tag = e.level === 'confirmada' ? 'confirmada' : 'provável';
-    if (d >= 0 && d <= 2) return { ...base, level: 'Muito alta', txt: `Ovulação ${tag} (${src}): hoje é um dos dias mais férteis` };
-    if (d === -1) return { ...base, level: 'Alta', txt: `Ovulação ${tag} (${src}) ontem: ainda dentro da janela` };
-    if (d < -1) return { ...base, level: 'Baixa', txt: `Ovulação já ocorreu neste ciclo (${src})` };
-    return { ...base, level: 'Alta', txt: `Ovulação ${tag} (${src}) para ${fmt(o)}` };
+    if (d >= 0 && d <= 2) return { ...base, level: 'Muito alta', txt: `Ovulação ${tag} (${src}): dias mais férteis` };
+    if (d === -1) return { ...base, level: 'Alta', txt: `Ovulação ${tag} ontem: ainda na janela` };
+    if (d < -1) return { ...base, level: 'Baixa', txt: `Ovulação já ocorreu (${src})` };
+    return { ...base, level: 'Alta', txt: `Ovulação ${tag} em ${sd(o)}` };
   }
-  if (TODAY > F.to) return { level: 'Incerta', beyond: true, txt: `Ciclo mais longo que o seu padrão (dia ${day}): a ovulação é incerta — o teste de LH ajuda` };
+  if (TODAY > F.to) return { level: 'Incerta', beyond: true, txt: `Dia ${day}, além do seu padrão: ovulação incerta` };
   const p = fertProb(A, day);
-  if (p === null) return { level: 'Incerta', txt: `Já passou do dia em que você costuma ovular (dia ${day}): a ovulação é incerta — o teste de LH ajuda` };
+  if (p === null) return { level: 'Incerta', txt: 'Passou do seu dia habitual de ovulação' };
   let level = p >= .5 ? 'Alta' : p >= .2 ? 'Média' : 'Baixa';
   if (mucus) level = 'Alta';
   const ov = isRegular(A) ? add(add(last.start, A.cycle), -A.luteal) : null;
-  return { level, p, ov, txt: `Estimativa pelo seu histórico de ovulação: ${Math.round(p * 100)}% dos seus ciclos estariam na janela fértil neste dia. Confirme com teste de LH e muco` };
+  return { level, p, ov, txt: `${Math.round(p * 100)}% dos seus ciclos estariam férteis hoje` };
+}
+
+// chance (%) de a menstruação chegar nos próximos `days` dias
+function periodProb(A, F, days) {
+  const last = A.g.at(-1), day = diff(TODAY, last.start) + 1;
+  if (TODAY > F.to) return null;
+  if (F.level) {
+    const from = Math.max(diff(F.from, TODAY), 0), to = diff(F.to, TODAY);
+    if (to < from) return null;
+    let k = 0; for (let i = from; i <= to; i++) if (i <= days) k++;
+    return Math.round(100 * k / (to - from + 1));
+  }
+  let num = 0, den = 0;
+  for (const [L, w] of A.samples) { if (L < day) continue; den += w; if (L <= day + days) num += w; }
+  return den ? Math.round(100 * num / den) : null;
 }
 
 // Cobertura do teste de gravidez: um teste negativo só "vale" para relações ocorridas pelo menos 14 dias antes dele.
@@ -281,41 +299,73 @@ function pregCheck(A) {
 let view = 'hoje';
 let cal = { y: new Date().getFullYear(), m: new Date().getMonth() };
 
+function cycleStrip(A, last, F, f, day) {
+  const plen = Math.max(diff(last.end, last.start) + 1, 1), beyond = TODAY > F.to;
+  const span = Math.min(Math.max(diff(F.to, last.start) + 3, day + 3, 20), 70);
+  const ovDay = f?.ov ? diff(f.ov, last.start) + 1 : null, wFrom = diff(F.from, last.start) + 1, wTo = diff(F.to, last.start) + 1;
+  let cells = '';
+  for (let d = 1; d <= span; d++) {
+    const c = [];
+    if (d <= plen) c.push('p');
+    let p = 0;
+    if (ovDay && d >= ovDay - 5 && d <= ovDay + 1) p = 1;
+    else if (!ovDay && !beyond && d >= day) p = fertProb(A, d, day) ?? 0;
+    if (p >= .15 && d > plen) c.push('f');
+    if (d === ovDay) c.push('o');
+    if (d >= wFrom && d <= wTo) c.push('w');
+    if (d === day) c.push('n');
+    cells += `<i class="${c.join(' ')}" ${p >= .15 ? `style="--p:${p.toFixed(2)}"` : ''}></i>`;
+  }
+  return `<div class="strip" style="grid-template-columns:repeat(${span},1fr)">${cells}</div>
+  <div class="lg"><span><i class="p"></i>Menstruação</span><span><i class="f"></i>Fértil</span><span><i class="o"></i>Ovulação</span><span><i class="w"></i>Previsão</span></div>`;
+}
+
 function vHoje() {
   const A = analyze(), last = A.g.at(-1);
-  if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Comece registrando o <b>primeiro dia da sua última menstruação</b> (ou importe o histórico em Ajustes). Com 3 ciclos o app já aprende o seu padrão.</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
-  const day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A);
-  const ph = phaseOf(TODAY, A);
-  const R = 90, C = 2 * Math.PI * R, pct = Math.min(day / Math.max(A.hi, day), 1);
-  const beyond = TODAY > F.to, over = diff(TODAY, F.to), pc = pregCheck(A);
-  const tdays = diff(F.center, TODAY);
-  const prec = F.confirmed ? ['Alta', `ovulação confirmada por ${F.src}`] : F.level === 'provável' ? ['Média', `ovulação provável (${F.src})`] : F.level === 'iminente' ? ['Média', 'muco fértil: ovulação iminente'] : A.n >= 6 ? ['Média', 'baseada em 6+ ciclos'] : A.n >= 3 ? ['Média', `baseada em ${A.n} ciclos`] : ['Baixa', 'poucos ciclos registrados'];
+  if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Registre o <b>primeiro dia da última menstruação</b> (ou importe seu histórico em Ajustes).</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
+  const day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), pc = pregCheck(A), ph = phaseOf(TODAY, A);
+  const beyond = TODAY > F.to, over = diff(TODAY, F.to), tdays = diff(F.center, TODAY);
+  const prec = F.confirmed ? 3 : F.level ? 2 : A.n >= 3 ? 2 : 1, precTxt = ['', 'Baixa', 'Média', 'Alta'][prec];
+  let st, head, sub;
+  if (beyond) { st = 'late'; head = `${over} dia${over > 1 ? 's' : ''} de atraso`; sub = `Seu padrão: ${A.lo}–${A.hi} dias`; }
+  else if (ph === 'menstrual') { st = 'mens'; head = 'Menstruação'; sub = `Dia ${day}`; }
+  else if (f && ['Alta', 'Muito alta'].includes(f.level)) { st = 'fert'; head = f.level === 'Muito alta' ? 'Pico de fertilidade' : 'Janela fértil'; sub = f.ov ? `Ovulação ${sd(f.ov)}` : `Chance ${f.level.toLowerCase()}`; }
+  else { st = ph === 'lutea' ? 'lut' : 'fol'; head = PHASE[ph] || 'Ciclo'; sub = tdays > 0 ? `Menstruação em ~${tdays}d` : 'Menstruação hoje'; }
+  const R = 44, C = 2 * Math.PI * R, pct = Math.min(day / Math.max(A.hi, day), 1);
+  const pr = periodProb(A, F, 7), L = S.logs[TODAY] || {};
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
-  const rows = [];
-  if (beyond) rows.push(`<div class="row"><span>Próxima menstruação</span><b style="color:var(--pink)">Atrasada · dia ${day}</b></div><div class="row"><span class="mute">Seu ciclo mais longo costuma ser</span><b>${A.hi} dias</b></div>`);
-  else rows.push(`<div class="row"><span>Próxima menstruação</span><b>${F.from === F.to ? fmt(F.from) : `${fmt(F.from)} – ${fmt(F.to)}`}</b></div><div class="row"><span class="mute">Mais provável</span><b>${fmt(F.center, { weekday: 'short', day: 'numeric', month: 'short' })}${tdays > 0 ? ` · em ${tdays}d` : tdays === 0 ? ' · hoje' : ''}</b></div>`);
-  rows.push(`<div class="row"><span class="mute">Precisão da previsão</span><span><span class="pill ${prec[0] === 'Alta' ? 'p-fertil' : prec[0] === 'Média' ? 'p-lutea' : 'p-folicular'}">${prec[0]}</span> <span class="mute small">${prec[1]}</span></span></div>`);
-  if (f?.ev) rows.push(`<div class="row"><span>Ovulação ${{ confirmada: 'confirmada', 'provável': 'provável', iminente: 'iminente' }[f.level2]}</span><b>${fmt(f.ov)}</b></div><div class="row"><span class="mute">Baseada em</span><span class="mute small" style="text-align:right">${ovSrc(last.start, TODAY)}</span></div><div class="row"><span>Janela fértil</span><b>${fmt(add(f.ov, -5))} – ${fmt(add(f.ov, 1))}</b></div>`);
-  else rows.push(`<div class="row"><span>Ovulação</span><span class="mute" style="text-align:right">ainda sem sinais registrados${diff(lhDate, TODAY) > 0 ? `<br>teste de LH a partir de ${fmt(lhDate)}` : '<br>use o teste de LH e registre o muco'}</span></div>`);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
-  if (pc?.hasNeg) rows.push(`<div class="row"><span>Gravidez</span><b style="color:var(--green)">${pc.covered ? 'Muito improvável' : 'Pouco provável'}</b></div>`);
-  rows.push(`<div class="row"><span>Chance de gravidez hoje</span><b style="color:${col}">${f ? f.level : '—'}</b></div>${f ? `<p class="note">${f.txt}.</p>` : ''}`);
-  const redCard = `<div class="card" style="border:1.5px solid var(--pink)"><h2 style="color:var(--pink)">Ciclo fora do seu padrão</h2><p style="margin:0 0 8px">Já são ${over} dia(s) além da sua faixa habitual (${A.lo}–${A.hi} dias). Em ciclos irregulares pode ser ovulação tardia, estresse, SOP ou tireoide — mas <b>gravidez é uma possibilidade</b>.</p><p style="margin:0" class="mute small">Faça um teste de gravidez (melhor com a primeira urina do dia) e registre o resultado aqui. Sem menstruar por 3 meses, procure seu ginecologista.</p></div>`;
-  const negCard = pc?.hasNeg ? `<div class="card"><h2>Atraso com teste negativo</h2><p style="margin:0 0 8px">Teste negativo em <b>${fmt(pc.lastNeg)}</b> (${diff(TODAY, pc.lastNeg)} dias atrás). Seu ciclo está ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}); com teste negativo, as causas mais comuns são ovulação tardia, estresse, tireoide ou SOP.</p><p style="margin:0 0 8px" class="mute small">${pc.line}</p><p style="margin:0" class="mute small">Se a menstruação não vier até ${fmt(add(last.start, 90))} (3 meses sem menstruar), ou se houver dor forte ou sangramento intenso, procure seu ginecologista.</p></div>` : '';
-  const alert = beyond && !S.settings.pregnancy ? (pc?.hasNeg ? negCard : redCard) : '';
-  const pos = Object.entries(S.logs).filter(([d, l]) => l.test === 'Positivo' && diff(TODAY, d) <= 14).length && !S.settings.pregnancy ? `<div class="card" style="background:var(--green-l)"><b>Teste positivo registrado.</b> <button class="chip" data-go="gest">Iniciar acompanhamento</button></div>` : '';
+  const ovTile = f?.ev ? [sd(f.ov), f.level2] : f?.ov ? [sd(f.ov), 'estimada'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
+  const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['pain', '⚡', 'Dor', (L.symptoms || []).includes('Dor na ovulação')], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não']]
+    .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
+  INFO = {
+    h_mens: ['Previsão da menstruação', `<p>${beyond ? `Seu ciclo está no dia ${day}, além da sua faixa habitual (${A.lo}–${A.hi} dias).` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
+    h_ov: ['Ovulação', f?.ev ? `<p>Ovulação <b>${f.level2}</b> em <b>${fmt(f.ov)}</b>, pelos sinais: ${ovSrc(last.start, TODAY)}.</p><p>Janela fértil: ${sr(add(f.ov, -5), add(f.ov, 1))}. Melhores dias: ${sr(add(f.ov, -2), f.ov)}.</p>` : `<p>Ainda sem sinais neste ciclo.</p><p>Registre o <b>muco</b> todo dia, a <b>dor</b> e o <b>teste de LH</b> (comece ${diff(lhDate, TODAY) > 0 ? 'em ' + fmt(lhDate) : 'hoje'}). Cada sinal ajusta a previsão.</p>`],
+    h_chance: ['Chance de gravidez hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p><p class="mute small">Estimativa: não serve como método contraceptivo.</p>`],
+    h_prec: ['Precisão da previsão', `<p>Precisão <b>${precTxt}</b>.</p><p>${prec === 3 ? 'A ovulação foi confirmada, então a menstruação é prevista com margem de ±2 dias.' : prec === 2 ? 'Baseada no seu histórico. Confirmar a ovulação (LH ou temperatura) deixa a previsão mais certeira.' : 'Poucos ciclos registrados. A previsão melhora a cada ciclo.'}</p>`],
+    h_alert: ['Atraso', pc?.hasNeg ? `<p>Teste negativo em <b>${fmt(pc.lastNeg)}</b> (${diff(TODAY, pc.lastNeg)} dias atrás). Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>${pc.line}</p><p>Causas comuns: ovulação tardia, estresse, tireoide ou SOP. Sem menstruar até ${fmt(add(last.start, 90))} (3 meses), ou com dor forte/sangramento intenso, procure seu ginecologista.</p>` : `<p>Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>Pode ser ovulação tardia, estresse, SOP ou tireoide, mas <b>gravidez é uma possibilidade</b>. Faça um teste (primeira urina do dia) e registre o resultado. Sem menstruar por 3 meses, procure seu ginecologista.</p>`]
+  };
+  const banner = beyond && !S.settings.pregnancy ? `<button class="banner" data-act="info" data-k="h_alert"><span>${pc?.hasNeg ? `Teste negativo em ${sd(pc.lastNeg)}` : 'Faça um teste de gravidez'}</span><b>Ver ›</b></button>` : '';
+  const pos = Object.entries(S.logs).filter(([d, l]) => l.test === 'Positivo' && diff(TODAY, d) <= 14).length && !S.settings.pregnancy ? `<div class="banner ok"><span>Teste positivo registrado</span><button class="chip" data-go="gest">Acompanhar gestação</button></div>` : '';
   const dk = isDark();
   return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${pregBanner()}${pos}${alert}
-  <div class="card hero">
-    <div class="ring"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--pink-l)" stroke-width="14"/><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--pink)" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}"/></svg>
-    <div class="c"><div class="mute">Dia do ciclo</div><div class="n">${day}</div><div class="mute small">seu padrão: ${A.lo}–${A.hi} dias</div></div></div>
-    ${ph && !beyond ? `<span class="pill p-${ph}">${PHASE[ph]}</span><p class="mute">${TIPS[ph]}</p>` : ''}
+  ${pregBanner()}${pos}${banner}
+  <section class="hh st-${st}">
+    <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
+    <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
+    <div class="ht"><h2>${head}</h2><p>${sub}</p></div></div>
+    ${cycleStrip(A, last, F, f, day)}
+  </section>
+  <div class="tiles4">
+    <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${beyond ? 'Atrasada' : sr(F.from, F.to)}</b><em>${beyond ? `dia ${day}` : `provável ${sd(F.center)}`}</em></button>
+    <button class="tile" data-act="info" data-k="h_ov"><small>Ovulação</small><b>${ovTile[0]}</b><em>${ovTile[1]}</em></button>
+    <button class="tile" data-act="info" data-k="h_chance"><small>Chance hoje</small><b style="color:${col}">${f ? f.level : '—'}</b><em>${f?.p != null ? Math.round(f.p * 100) + '% dos ciclos' : f?.ev ? 'ovulação ' + f.level2 : ''}</em></button>
+    <button class="tile" data-act="info" data-k="h_mens"><small>Menstrua em 7 dias</small><b>${pr == null ? '—' : pr + '%'}</b><em>${pr == null ? 'fora do padrão' : 'de chance'}</em></button>
   </div>
-  <div class="card">${rows.join('')}</div>
-  <button class="btn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? 'Editar registro de hoje' : 'Registrar hoje'}</button>
-  <p class="note">Com ciclos irregulares as datas são faixas de probabilidade, não certezas. Elas melhoram a cada ciclo — e muito mais quando você registra testes de LH e temperatura. Não serve como método contraceptivo.</p>`;
+  <h2 class="sec2">Registrar hoje</h2>
+  <div class="qrow">${quick}<button class="qk more" data-act="log" data-d="${TODAY}"><span>＋</span>Mais</button></div>
+  <p class="fine">Estimativas · não é método contraceptivo</p>`;
 }
 
 function vCal() {
@@ -678,9 +728,9 @@ function vEng() {
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
   const ovLo = add(last.start, A.lo - A.luteal), ovHi = add(last.start, A.hi - A.luteal);
   let plan;
-  if (f?.ev) plan = `<div class="row"><span>Ovulação ${f.level2} (${ovSrc(last.start, TODAY)})</span><b>${fmt(f.ov)}</b></div><div class="row"><span>Janela fértil</span><b>${fmt(add(f.ov, -5))} – ${fmt(add(f.ov, 1))}</b></div><div class="row"><span class="green">Melhores dias</span><b style="color:var(--green)">${fmt(add(f.ov, -2))} – ${fmt(f.ov)}</b></div><div class="row"><span>Teste de gravidez a partir de</span><b>${fmt(F.center)}</b></div><p class="note">A menstruação costuma vir ~${A.luteal} dias após a ovulação (previsão: ${fmt(F.from)} a ${fmt(F.to)}). ${f.level2 === 'confirmada' ? '' : 'Com um teste de LH positivo ou a subida da temperatura, a previsão fica mais precisa.'}</p>`;
-  else if (beyond) plan = `<p class="mute" style="margin:0">Seu ciclo está mais longo que o seu padrão, então não dá para projetar a ovulação pelo calendário. ${pc?.hasNeg ? 'Com o teste negativo, o caminho é usar o teste de LH diário para ver se e quando você vai ovular.' : 'Faça um teste de gravidez; se negativo, use o teste de LH diário para ver se e quando você vai ovular.'}</p>`;
-  else plan = `<div class="row"><span>Ovulação provável entre</span><b>${fmt(ovLo)} – ${fmt(ovHi)}</b></div><div class="row"><span>Começar teste de LH em</span><b>${diff(lhDate, TODAY) > 0 ? `${fmt(lhDate)} (dia ${lhDay})` : 'hoje, 1–2x ao dia'}</b></div><div class="row"><span>Teste de gravidez a partir de</span><b>${fmt(F.from)}</b></div><p class="note">${A.hi - A.lo > 6 ? `Seu ciclo varia de ${A.lo} a ${A.hi} dias, então a ovulação pode cair em qualquer ponto dessa faixa. Quando o teste de LH der positivo, tenha relações nesse dia e nos 2 seguintes (e a cada 1–2 dias antes). Registrar o LH aqui faz o app calcular a sua menstruação com precisão.` : 'Confirme com teste de LH, muco e temperatura.'}</p>`;
+  if (f?.ev) plan = `<div class="row"><span>Ovulação ${f.level2} (${ovSrc(last.start, TODAY)})</span><b>${fmt(f.ov)}</b></div><div class="row"><span>Janela fértil</span><b>${fmt(add(f.ov, -5))} – ${fmt(add(f.ov, 1))}</b></div><div class="row"><span class="green">Melhores dias</span><b style="color:var(--green)">${fmt(add(f.ov, -2))} – ${fmt(f.ov)}</b></div><div class="row"><span>Teste de gravidez a partir de</span><b>${fmt(F.center)}</b></div><p class="note">Menstruação prevista: ${sr(F.from, F.to)}.</p>`;
+  else if (beyond) plan = `<p class="mute" style="margin:0">Ciclo além do seu padrão: use o teste de LH diário para ver se e quando você ovula.</p>`;
+  else plan = `<div class="row"><span>Ovulação provável entre</span><b>${fmt(ovLo)} – ${fmt(ovHi)}</b></div><div class="row"><span>Começar teste de LH em</span><b>${diff(lhDate, TODAY) > 0 ? `${fmt(lhDate)} (dia ${lhDay})` : 'hoje, 1–2x ao dia'}</b></div><div class="row"><span>Teste de gravidez a partir de</span><b>${fmt(F.from)}</b></div><p class="note">${A.hi - A.lo > 6 ? 'Ciclo irregular: registre o teste de LH e o muco para a previsão ficar certeira.' : 'Confirme com teste de LH e muco.'}</p>`;
   let tries = 0;
   if (f?.ov) for (let d = add(f.ov, -5); d <= add(f.ov, 1); d = add(d, 1)) if (S.logs[d]?.sex && S.logs[d].sex !== 'Não') tries++;
   const color = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
@@ -790,6 +840,15 @@ document.addEventListener('click', e => {
       $sheet.showModal(); break;
     }
     case 'theme': { try { localStorage.setItem(THEME_KEY, isDark() ? 'light' : 'dark'); } catch {} applyTheme(); render(); break; }
+    case 'q': {
+      const k = t.dataset.k, Lg = S.logs[TODAY] ||= {};
+      if (k === 'muc') { if (FERT_MUC.includes(Lg.mucus)) delete Lg.mucus; else Lg.mucus = 'Clara de ovo'; }
+      else if (k === 'lh') { if (Lg.lh === 'Positivo') delete Lg.lh; else Lg.lh = 'Positivo'; }
+      else if (k === 'pain') { const x = new Set(Lg.symptoms || []); if (x.has('Dor na ovulação')) x.delete('Dor na ovulação'); else x.add('Dor na ovulação'); if (x.size) Lg.symptoms = [...x]; else delete Lg.symptoms; }
+      else if (k === 'sex') { if (Lg.sex && Lg.sex !== 'Não') delete Lg.sex; else Lg.sex = 'Sim'; }
+      if (!Object.keys(Lg).length) delete S.logs[TODAY];
+      const y = scrollY; save(); render(); scrollTo(0, y); break;
+    }
     case 'close': $sheet.close(); break;
     case 'prev': cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); break;
     case 'next': cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); break;

@@ -127,3 +127,42 @@ main>*{animation:up .35s both}main>*:nth-child(2){animation-delay:.05s}main>*:nt
 .sw[aria-checked="true"] .tr i{transform:translateX(18px)}
 .sw[aria-checked="true"] .tr svg{opacity:1}
 @media(prefers-reduced-motion:reduce){.sw .tr,.sw .tr i,.sw .tr svg{transition:none}}
+
+/* ---- Hoje: destaque dinâmico ---- */
+.hh{position:relative;border-radius:28px;padding:18px 16px 14px;color:#fff;margin-bottom:12px;box-shadow:0 14px 34px -12px var(--gl,rgba(232,69,107,.55));background:linear-gradient(145deg,var(--g1),var(--g2))}
+.st-mens{--g1:#ff6b8b;--g2:#d6275a;--gl:rgba(214,39,90,.6)}
+.st-fert{--g1:#27c4a0;--g2:#0e8f9c;--gl:rgba(14,143,156,.55)}
+.st-fol{--g1:#8e7cf0;--g2:#5a43c4;--gl:rgba(90,67,196,.55)}
+.st-lut{--g1:#ffb347;--g2:#e5701f;--gl:rgba(229,112,31,.5)}
+.st-late{--g1:#ef4a6a;--g2:#7d1d3f;--gl:rgba(125,29,63,.6)}
+.prec{position:absolute;top:12px;right:14px;border:0;background:#ffffff26;color:#fff;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:.02em}
+.dots{letter-spacing:2px;margin-left:2px}
+.hr{display:flex;align-items:center;gap:16px;margin:22px 0 14px}
+.ring2{position:relative;width:104px;height:104px;flex:none}.ring2 svg{width:100%;height:100%}
+.ring2>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ring2 small{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.08em}.ring2 b{font-size:38px;font-weight:800}
+.ht h2{margin:0;font-size:26px;line-height:1.1;font-weight:800;letter-spacing:-.02em;color:#fff;text-transform:none}
+.ht p{margin:6px 0 0;font-size:15px;opacity:.92}
+.strip{display:grid;gap:2px}.strip i{display:block;height:14px;border-radius:4px;background:#ffffff2e}
+.strip i.p{background:#fff}.strip i.f{background:rgba(255,255,255,calc(.3 + var(--p,1)*.55))}
+.strip i.o{background:#fff;box-shadow:0 0 0 2px #ffffffcc;transform:scaleY(1.45);border-radius:6px}
+.strip i.w{background:repeating-linear-gradient(135deg,#ffffff66 0 3px,#ffffff1a 3px 6px)}
+.strip i.n{box-shadow:0 0 0 2px #fff;transform:scaleY(1.45);z-index:1}
+.strip.mk{margin-top:2px}.strip.mk b{font-size:9px;text-align:center;line-height:1;opacity:.95;overflow:visible}
+.lg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:11px;opacity:.92}.lg span{display:flex;align-items:center;gap:5px}.lg i{width:10px;height:10px;border-radius:3px;background:#ffffff2e;display:inline-block}
+.lg i.p{background:#fff}.lg i.f{background:#ffffffa6}.lg i.o{background:#fff;border-radius:50%}.lg i.w{background:repeating-linear-gradient(135deg,#ffffff88 0 2px,#ffffff22 2px 4px)}
+.tiles4{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.tile{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:12px 14px;box-shadow:var(--sh);min-width:0}
+.tile small{font-size:11px;color:var(--mute);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.tile b{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.15}.tile em{font-style:normal;font-size:12px;color:var(--mute)}
+.sec2{margin:18px 0 8px}
+.qrow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.qk{display:flex;flex-direction:column;align-items:center;gap:4px;border:1.5px solid var(--line);background:var(--card);border-radius:18px;padding:10px 2px;font-size:11px;font-weight:700;color:var(--mute);transition:transform .12s,background .15s}
+.qk span{font-size:22px;line-height:1}.qk:active{transform:scale(.94)}
+.qk.on{background:var(--pink-l);border-color:var(--pink);color:var(--pink)}.qk.more span{color:var(--pink);font-weight:800}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:1.5px solid var(--pink);background:var(--pink-l);color:var(--ink);border-radius:18px;padding:11px 14px;margin-bottom:10px;font-size:14px;font-weight:700;text-align:left}
+.banner b{color:var(--pink);white-space:nowrap}.banner.ok{border-color:var(--green);background:var(--green-l)}
+.fine{text-align:center;font-size:11px;color:var(--mute);margin:14px 0 0}
+
+.toprow h1{font-size:20px;line-height:1.15}
+.strip{margin-top:2px}
