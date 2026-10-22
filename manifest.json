@@ -1,0 +1,10 @@
+{
+  "name": "Meu Ciclo",
+  "short_name": "Ciclo",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fff5f7",
+  "theme_color": "#e8456b",
+  "lang": "pt-BR",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
