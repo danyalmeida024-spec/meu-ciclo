@@ -596,36 +596,73 @@ function render() {
 }
 
 // ---------- registro do dia ----------
+// ---------- registro do dia (um cartão por assunto) ----------
+const norm2 = x => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const YN = [['Negativo', 'Negativo', '➖'], ['Positivo', 'Positivo', '➕']];
+const DSEC = [
+  { id: 'flow', t: 'Menstruação', c: '#e8456b', g: [{ k: 'flow', multi: false, o: [['spot', 'Escape', '🩸'], ['light', 'Fluxo leve', '💧'], ['med', 'Fluxo médio', '🩸'], ['heavy', 'Fluxo intenso', '🌊']] }] },
+  { id: 'sint', t: 'Sintomas', c: '#7a5bd1', g: [{ k: 'symptoms', multi: true, o: [['Cólica', 'Cólicas', '⚡'], ['Dor de cabeça', 'Dor de cabeça', '🤕'], ['Inchaço', 'Inchaço', '🎈'], ['Seios sensíveis', 'Seios sensíveis', '💗'], ['Acne', 'Acne', '🔴'], ['Cansaço', 'Cansaço', '😴'], ['Náusea', 'Náusea', '🤢'], ['Dor lombar', 'Dor lombar', '🔙'], ['Desejo de doce', 'Desejo de doce', '🍫'], ['Insônia', 'Insônia', '🌙'], ['Dor na ovulação', 'Dor na ovulação', '📍'], ['Tontura', 'Tontura', '💫'], ['Dor nas pernas', 'Dor nas pernas', '🦵'], ['Dor nas articulações', 'Dor nas articulações', '🦴']] }] },
+  { id: 'humor', t: 'Humor', c: '#f0932b', g: [{ k: 'mood', multi: true, o: [['Calma', 'Calma', '😌'], ['Feliz', 'Feliz', '🙂'], ['Energizada', 'Energizada', '🤩'], ['Alegre', 'Alegre', '😄'], ['Mudanças de humor', 'Mudanças de humor', '🎭'], ['Irritada', 'Irritada', '😠'], ['Triste', 'Triste', '😢'], ['Ansiosa', 'Ansiosa', '😰'], ['Sensível', 'Sensível', '🥺'], ['Desanimada', 'Desanimada', '😞'], ['Culpada', 'Culpada', '😔']] }] },
+  { id: 'sexo', t: 'Sexo e libido', c: '#d6336c', g: [{ k: 'sex', multi: false, o: [['Não', 'Não fiz sexo', '🚫'], ['Com proteção', 'Sexo com proteção', '🛡️'], ['Sem proteção', 'Sexo sem proteção', '❤️']] }, { k: 'libido', multi: false, o: [['Alta', 'Libido alta', '🔥'], ['Neutra', 'Libido neutra', '😐'], ['Baixa', 'Libido baixa', '🧊']] }] },
+  { id: 'muco', t: 'Secreção vaginal', c: '#1f8fa8', g: [{ k: 'mucus', multi: false, o: [['Seco', 'Sem secreção', '🏜️'], ['Pegajoso', 'Pegajosa', '🍯'], ['Cremoso', 'Cremosa', '🥛'], ['Clara de ovo', 'Clara de ovo', '🥚'], ['Aquoso', 'Aquosa', '💦']] }] },
+  { id: 'testes', t: 'Testes', c: '#12a07f', g: [{ l: 'Teste de ovulação (LH)', k: 'lh', multi: false, o: YN }, { l: 'Teste de gravidez', k: 'test', multi: false, o: YN }] },
+  { id: 'corpo', t: 'Temperatura e peso', c: '#e8871e', inputs: [['temp', 'Temperatura basal', '°C', '36,50'], ['peso', 'Peso', 'kg', '60,0']] },
+  { id: 'dig', t: 'Digestão e fezes', c: '#8a6d3b', g: [{ k: 'digestao', multi: true, o: [['Normal', 'Normal', '✅'], ['Inchaço', 'Inchaço', '🎈'], ['Constipação', 'Constipação', '🧱'], ['Diarreia', 'Diarreia', '🚽'], ['Gases', 'Gases', '💨'], ['Náusea', 'Náusea', '🤢']] }] },
+  { id: 'treino', t: 'Atividade física', c: '#2f9e44', g: [{ k: 'treino', multi: true, o: [['Descanso', 'Descanso', '🛋️'], ['Caminhada', 'Caminhada', '🚶'], ['Corrida', 'Corrida', '🏃'], ['Yoga', 'Yoga', '🧘'], ['Musculação', 'Musculação', '🏋️'], ['Natação', 'Natação', '🏊'], ['Ciclismo', 'Ciclismo', '🚴'], ['Dança', 'Dança', '💃']] }] },
+  { id: 'sono', t: 'Sono', c: '#4c6ef5', g: [{ k: 'sono', multi: false, o: [['<5h', 'Menos de 5h', '🥱'], ['5–6h', '5 a 6 horas', '😪'], ['7–8h', '7 a 8 horas', '😊'], ['9h+', '9 horas ou mais', '😴']] }] },
+  { id: 'meds', t: 'Remédios e suplementos', c: '#0c8599', g: [{ k: 'meds', multi: true, o: [['Anticoncepcional', 'Anticoncepcional', '💊'], ['Ácido fólico', 'Ácido fólico', '🌿'], ['Vitaminas', 'Vitaminas', '🧪'], ['Analgésico', 'Analgésico', '🩹'], ['Anti-inflamatório', 'Anti-inflamatório', '💉'], ['Outro', 'Outro', '➕']] }] },
+  { id: 'notas', t: 'Anotações', c: '#6c7a89', note: true }
+];
+let DAY = null, dayT = 0, toastT = 0;
+const cycleDayOf = date => { const A = analyze(), i = A.g.findLastIndex(x => x.start <= date); return i < 0 ? null : diff(date, A.g[i].start) + 1; };
+const isOn = (g, v) => g.multi ? (DAY.L[g.k] || []).includes(v) : DAY.L[g.k] === v;
+function secCount(sec) {
+  let n = 0;
+  (sec.g || []).forEach(g => { const x = DAY.L[g.k]; if (g.multi) n += (x || []).length; else if (x !== undefined) n++; });
+  (sec.inputs || []).forEach(([k]) => { if (DAY.L[k] != null) n++; });
+  if (sec.note && DAY.L.notes) n = 1;
+  return n;
+}
+function dayCard(sec) {
+  const L = DAY.L;
+  const body = sec.note ? `<textarea id="dn" rows="3" placeholder="Escreva como foi o seu dia…">${esc(L.notes || '')}</textarea>`
+    : sec.inputs ? `<div class="inps">${sec.inputs.map(([k, l, u, ph]) => `<label class="inp"><small>${l}</small><span><input data-num="${k}" inputmode="decimal" placeholder="${ph}" value="${L[k] != null ? String(L[k]).replace('.', ',') : ''}"><em>${u}</em></span></label>`).join('')}</div>`
+    : sec.g.map(g => {
+      const o = g.k === 'sex' && L.sex === 'Sim' ? [...g.o, ['Sim', 'Sexo (sem detalhe)', '💞']] : g.o;
+      return `${g.l ? `<h4>${g.l}</h4>` : ''}<div class="chs">${o.map(([v, l, e]) => `<button class="ch ${isOn(g, v) ? 'on' : ''}" data-act="ch" data-k="${g.k}" data-v="${esc(v)}" data-multi="${g.multi ? 1 : 0}"><span class="ico">${e}</span><span class="lb">${l}</span></button>`).join('')}</div>`;
+    }).join('');
+  const n = secCount(sec);
+  return `<section class="dc2" id="sec-${sec.id}" style="--c:${sec.c}"><header><h3>${sec.t}</h3><span class="cnt" data-cnt="${sec.id}">${n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''}</span></header>${body}</section>`;
+}
 function openDay(date) {
-  const L = structuredClone(S.logs[date] || {});
-  const chips = (k, opts, multi) => `<div class="chips" data-k="${k}" data-multi="${multi ? 1 : 0}">${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; const on = multi ? (L[k] || []).includes(v) : L[k] === v; return `<button class="chip ${on ? 'on' : ''}" data-v="${v}">${l}</button>`; }).join('')}</div>`;
-  $sheet.innerHTML = `<h1 class="cap">${fmt(date, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-    <label class="f">Fluxo</label>${chips('flow', FLOW)}
-    <label class="f">Sintomas</label>${chips('symptoms', SYMPTOMS, 1)}
-    <label class="f">Humor</label>${chips('mood', MOODS, 1)}
-    <label class="f">Muco cervical</label>${chips('mucus', MUCUS)}
-    <div class="two"><div><label class="f">Temperatura basal (°C)</label><input id="temp" inputmode="decimal" placeholder="36,50" value="${L.temp ? String(L.temp).replace('.', ',') : ''}"></div>
-    <div><label class="f">Teste de ovulação</label><div style="height:2px"></div>${chips('lh', LH)}</div></div>
-    <label class="f">Teste de gravidez</label>${chips('test', ['Negativo', 'Positivo'])}
-    <label class="f">Relação sexual</label>${chips('sex', SEX)}
-    <label class="f">Anotações</label><textarea id="notes" rows="2">${esc(L.notes || '')}</textarea>
-    <div style="height:14px"></div><button class="btn" data-act="save" data-d="${date}">Salvar</button><div style="height:8px"></div><button class="btn alt" data-act="close">Cancelar</button>`;
-  $sheet.showModal();
+  DAY = { date, L: structuredClone(S.logs[date] || {}) };
+  const cd = cycleDayOf(date), title = date === TODAY ? 'Hoje' : fmt(date, { weekday: 'short', day: 'numeric', month: 'short' });
+  $sheet.className = 'full';
+  $sheet.innerHTML = `<div class="dh"><button class="ib" data-act="close" aria-label="Fechar">✕</button><div class="dt"><b>${title}</b><small>${cd ? cd + 'º dia do ciclo' : 'sem ciclo registrado'}</small></div><span class="dnav"><button class="ib" data-act="dprev" aria-label="Dia anterior">‹</button><button class="ib" data-act="dnext" ${date >= TODAY ? 'disabled' : ''} aria-label="Próximo dia">›</button></span></div>
+  <div class="ds"><input id="dq" type="search" placeholder="Buscar sintoma, humor…" autocomplete="off"><div class="jumps">${DSEC.map(x => `<button class="jp" data-act="jump" data-id="${x.id}" style="--c:${x.c}">${x.t}</button>`).join('')}</div></div>
+  <div class="dsc" id="dsc">${DSEC.map(dayCard).join('')}<div class="dend"></div></div><div class="toast" id="toast">Salvo ✓</div>`;
+  if (!$sheet.open) $sheet.showModal();
+}
+function commitDay() {
+  const { date, L } = DAY;
+  const clean = Object.fromEntries(Object.entries(L).filter(([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)));
+  if (Object.keys(clean).length) S.logs[date] = clean; else delete S.logs[date];
+  save();
+  const t = document.getElementById('toast'); if (t) { t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 900); }
+}
+function updateCounts() {
+  DSEC.forEach(sec => { const el = document.querySelector(`[data-cnt="${sec.id}"]`); if (!el) return; const n = secCount(sec); el.textContent = n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''; });
+}
+function filterDay(q) {
+  q = norm2(q.trim());
+  document.querySelectorAll('#dsc .dc2').forEach(sec => {
+    const titleHit = q && norm2(sec.querySelector('h3').textContent).includes(q), chips = [...sec.querySelectorAll('.ch')];
+    let any = false;
+    chips.forEach(c => { const m = !q || titleHit || norm2(c.textContent).includes(q); c.hidden = !m; if (m) any = true; });
+    sec.hidden = q ? !(any || titleHit) : false;
+  });
 }
 
-function saveDay(date) {
-  const L = {};
-  $sheet.querySelectorAll('.chips').forEach(c => {
-    const on = [...c.querySelectorAll('.chip.on')].map(x => x.dataset.v);
-    if (on.length) L[c.dataset.k] = c.dataset.multi === '1' ? on : on[0];
-  });
-  const t = parseFloat($sheet.querySelector('#temp').value.replace(',', '.'));
-  if (t >= 34 && t <= 42) L.temp = t;
-  const n = $sheet.querySelector('#notes').value.trim();
-  if (n) L.notes = n;
-  if (Object.keys(L).length) S.logs[date] = L; else delete S.logs[date];
-  save(); $sheet.close(); render();
-}
 
 
 // ---------- gestação ----------
@@ -916,9 +953,9 @@ function importHist(text) {
 // ---------- eventos ----------
 const $main = document.getElementById('main'), $sheet = document.getElementById('sheet');
 let pending = null;
-function dialog(html) { $sheet.innerHTML = html + '<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>'; if (!$sheet.open) $sheet.showModal(); }
+function dialog(html) { $sheet.className = ''; $sheet.innerHTML = html + '<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>'; if (!$sheet.open) $sheet.showModal(); }
 const notify = msg => dialog(`<p style="font-size:17px">${msg}</p>`);
-function ask(msg, yes, fn) { pending = fn; $sheet.innerHTML = `<p style="font-size:17px">${msg}</p><button class="btn" data-act="yes">${yes}</button><div style="height:8px"></div><button class="btn alt" data-act="close">Cancelar</button>`; if (!$sheet.open) $sheet.showModal(); }
+function ask(msg, yes, fn) { pending = fn; $sheet.className = ''; $sheet.innerHTML = `<p style="font-size:17px">${msg}</p><button class="btn" data-act="yes">${yes}</button><div style="height:8px"></div><button class="btn alt" data-act="close">Cancelar</button>`; if (!$sheet.open) $sheet.showModal(); }
 const bkmsg = t => { const el = document.getElementById('bkmsg'); if (el) el.textContent = t; };
 function doImport(txt) {
   try { const x = JSON.parse(txt); if (!x.logs) throw 0; S = norm(x); save(); $sheet.close(); render(); } catch { bkmsg('Backup inválido: confira se colou o texto inteiro.'); }
@@ -937,7 +974,21 @@ document.addEventListener('click', e => {
   }
   switch (t.dataset.act) {
     case 'log': openDay(t.dataset.d); break;
-    case 'save': saveDay(t.dataset.d); break;
+    case 'ch': {
+      const { k, v, multi } = t.dataset, Lg = DAY.L;
+      if (multi === '1') { const a = new Set(Lg[k] || []); if (a.has(v)) a.delete(v); else a.add(v); if (a.size) Lg[k] = [...a]; else delete Lg[k]; t.classList.toggle('on'); }
+      else { if (Lg[k] === v) delete Lg[k]; else Lg[k] = v; t.parentElement.querySelectorAll('.ch').forEach(x => x.classList.toggle('on', Lg[k] === x.dataset.v)); }
+      t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop');
+      try { navigator.vibrate?.(8); } catch {}
+      commitDay(); updateCounts(); break;
+    }
+    case 'dprev': openDay(add(DAY.date, -1)); break;
+    case 'dnext': if (DAY.date < TODAY) openDay(add(DAY.date, 1)); break;
+    case 'jump': {
+      const el = document.getElementById('sec-' + t.dataset.id), box = document.getElementById('dsc');
+      if (el && box) box.scrollTo({ top: el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 6, behavior: 'smooth' });
+      break;
+    }
     case 'chk': { const k = t.dataset.k, y = scrollY; S.settings.checklist[k] = !S.settings.checklist[k]; save(); render(); scrollTo(0, y); break; }
     case 'startpreg': {
       const dpp = document.getElementById('dpp').value, dum = document.getElementById('dum').value;
@@ -949,6 +1000,7 @@ document.addEventListener('click', e => {
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
     case 'info': {
       const [title, html] = INFO[t.dataset.k];
+      $sheet.className = '';
       $sheet.innerHTML = `<h1>${title}</h1>${html}<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>`;
       $sheet.showModal(); break;
     }
@@ -1015,7 +1067,19 @@ document.addEventListener('input', e => {
   if (b3.querySelector('canvas')) { clearTimeout(t3); t3 = setTimeout(mount3d, 60); } else b3.innerHTML = fetusSvg(gv);
   document.getElementById('wk-cards').innerHTML = weekCards(gv);
 });
-$sheet.addEventListener('click', e => { if (e.target === $sheet) $sheet.close(); });
+$sheet.addEventListener('click', e => { if (e.target === $sheet && !$sheet.classList.contains('full')) $sheet.close(); });
+$sheet.addEventListener('close', () => { if ($sheet.classList.contains('full')) { $sheet.className = ''; DAY = null; render(); } });
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'dq') { filterDay(el.value); return; }
+  if (!DAY) return;
+  if (el.id === 'dn') { const v = el.value.trim(); if (v) DAY.L.notes = v; else delete DAY.L.notes; }
+  else if (el.dataset.num) {
+    const k = el.dataset.num, v = parseFloat(el.value.replace(',', '.')), ok = k === 'temp' ? v >= 34 && v <= 42 : v >= 25 && v <= 300;
+    if (ok) DAY.L[k] = v; else delete DAY.L[k];
+  } else return;
+  clearTimeout(dayT); dayT = setTimeout(() => { commitDay(); updateCounts(); }, 450);
+});
 
 applyGoal();
 render();
