@@ -371,7 +371,9 @@ function vHojeConceive(A, last) {
   const tq = L.test === 'Positivo' ? 'pos' : L.test === 'Negativo' ? 'neg' : '';
   const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não'], ['test', tq === 'pos' ? '➕' : tq === 'neg' ? '➖' : '🧾', tq === 'pos' ? 'Positivo' : tq === 'neg' ? 'Negativo' : 'Teste', !!tq]]
     .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
+  const ins = insights(A);
   INFO = {
+    ...insightInfo(ins),
     c_win: ['Janela fértil', `<p>${win ? `Janela: <b>${sr(win[0], win[1])}</b> (${src}). Melhores dias: <b>${sr(best[0], best[1])}</b>.` : 'Ainda não consigo estimar a janela.'}</p><p>Os 5 dias antes da ovulação e o dia dela são férteis; os 2 dias antes e o dia da ovulação são os melhores. Com teste de LH e muco registrados, a janela fica certeira.</p>`],
     c_chance: ['Chance hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p>`],
     c_test: ['Teste de gravidez', `<p>Faça a partir de <b>${fmt(testDate)}</b> (primeira urina do dia). Antes disso pode dar falso negativo.</p>${pc?.hasNeg ? `<p>${pc.line}</p>` : ''}`],
@@ -387,6 +389,7 @@ function vHojeConceive(A, last) {
     <div class="ht"><h2>${H[1]}</h2><p>${H[2]}</p></div></div>
     ${cycleStrip(A, last, F, f, day)}
   </section>
+  ${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="c_win"><small>Janela fértil</small><b>${win ? sr(win[0], win[1]) : '—'}</b><em>${src || 'sem estimativa'}</em></button>
     <button class="tile" data-act="info" data-k="c_win"><small>Melhores dias</small><b>${best ? sr(best[0], best[1]) : '—'}</b><em>${ov ? 'ovulação ' + sd(ov) : ''}</em></button>
@@ -399,6 +402,58 @@ function vHojeConceive(A, last) {
   <div class="qrow q5">${quick}<button class="qk more" data-act="log" data-d="${TODAY}"><span>＋</span>Mais</button></div>
   ${pregBanner()}
   <p class="fine">Estimativas · confirme com teste de LH e orientação médica</p>`;
+}
+
+// ---------- o que o app identificou no ciclo ----------
+// Observações calculadas só a partir do que você registrou. Não são diagnóstico.
+function insights(A) {
+  const last = A.g.at(-1), out = [], F = nextPeriod(A), beyond = TODAY > F.to, over = diff(TODAY, F.to), day = diff(TODAY, last.start) + 1, pc = pregCheck(A);
+  const exp = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex)).sort();
+  const posRecent = Object.keys(S.logs).some(d => S.logs[d].test === 'Positivo' && diff(TODAY, d) <= 21);
+  // 1) possibilidade de gravidez
+  let g;
+  if (S.settings.pregnancy) g = { lvl: 'ok', pill: 'Em acompanhamento', short: 'Gestação registrada no app', text: '<p>Você está acompanhando uma gestação na aba Gestação.</p>' };
+  else if (posRecent) g = { lvl: 'alert', pill: 'Teste positivo', short: 'Inicie o acompanhamento e marque o pré-natal', text: '<p>Há um teste positivo registrado nos últimos dias. Procure seu médico para confirmar (beta-HCG) e iniciar o pré-natal.</p>' };
+  else if (!exp.length) g = { lvl: 'ok', pill: 'Baixa', short: 'Sem relação sem proteção neste ciclo', text: '<p>Não há relação sem proteção registrada neste ciclo, então a chance de gravidez é baixa.</p>' };
+  else if (beyond) {
+    if (pc.hasNeg && pc.covered) g = { lvl: 'ok', pill: 'Muito baixa', short: `Teste negativo em ${sd(pc.lastNeg)} cobre as relações`, text: `<p>${pc.line}</p>` };
+    else if (!pc.hasNeg && over >= 7) g = { lvl: 'alert', pill: 'Alta', short: `${over} dias de atraso + relação sem proteção`, text: `<p>Ciclo ${over} dias além da sua faixa habitual (${A.lo}–${A.hi}) e relação sem proteção neste ciclo. Faça um teste de gravidez.</p>` };
+    else g = { lvl: 'warn', pill: 'Possível', short: pc.hasNeg ? 'O teste negativo não cobre todas as relações' : `${over} dia(s) de atraso + relação sem proteção`, text: `<p>${pc.hasNeg ? `Teste negativo em ${fmt(pc.lastNeg)}. ${pc.line}` : 'Ciclo atrasado com relação sem proteção neste ciclo. Faça um teste de gravidez (primeira urina do dia).'}</p><p>Atrasos em ciclos irregulares também podem ter outras causas.</p>` };
+  } else {
+    const c = conceiveInfo(A), hit = c.win && exp.some(d => d >= c.win[0] && d <= c.win[1]);
+    g = hit ? { lvl: 'info', pill: 'Possível', short: `Relação na janela fértil · teste a partir de ${sd(c.testDate)}`, text: `<p>Houve relação sem proteção dentro da janela fértil estimada (${sr(c.win[0], c.win[1])}). Faça o teste de gravidez a partir de <b>${fmt(c.testDate)}</b>.</p>` }
+      : { lvl: 'ok', pill: 'Baixa', short: 'Relações fora da janela fértil estimada', text: '<p>As relações sem proteção registradas ficaram fora da janela fértil estimada. A estimativa pode errar em ciclos irregulares.</p>' };
+  }
+  out.push({ id: 'preg', ic: '🤰', title: 'Gravidez', ...g });
+  // 2) regularidade
+  const sp = A.spread;
+  out.push(sp == null ? { id: 'reg', ic: '🔁', title: 'Regularidade', lvl: 'info', pill: 'Poucos ciclos', short: 'Registre mais ciclos para avaliar', text: '<p>Preciso de pelo menos 3 menstruações registradas para avaliar a regularidade.</p>' }
+    : { id: 'reg', ic: '🔁', title: 'Regularidade', lvl: sp <= 7 ? 'ok' : sp <= 9 ? 'info' : 'warn', pill: sp <= 7 ? 'Regular' : sp <= 9 ? 'Limítrofe' : 'Irregular', short: `Ciclos de ${A.min} a ${A.max} dias (variação de ${sp})`, text: `<p>Seus ciclos variaram <b>${sp} dias</b> (de ${A.min} a ${A.max}). Pela FIGO, variação de até 7–9 dias é considerada regular.</p>` });
+  // 3) sinais compatíveis com SOP / anovulação
+  const starts = A.g.map(x => x.start), gaps = starts.slice(1).map((d, i) => diff(d, starts[i])), longs = A.lens.slice(-6).filter(l => l > 35).length;
+  const lhNeg = Object.keys(S.logs).filter(d => d >= last.start && S.logs[d].lh === 'Negativo').length, lhPos = Object.keys(S.logs).some(d => d >= last.start && S.logs[d].lh === 'Positivo');
+  const acne = Object.keys(S.logs).filter(d => diff(TODAY, d) <= 60 && (S.logs[d].symptoms || []).includes('Acne')).length;
+  const sig = [];
+  if (sp != null && sp >= 10) sig.push(`ciclos irregulares (variação de ${sp} dias)`);
+  if (longs >= 2 || gaps.some(x => x > 45)) sig.push(`ciclos longos (${longs ? longs + ' acima de 35 dias' : 'intervalo acima de 45 dias'})`);
+  if (day > 45 && !S.settings.pregnancy) sig.push(`ciclo atual com ${day} dias`);
+  if (lhNeg >= 5 && !lhPos && day > 20) sig.push(`${lhNeg} testes de LH negativos sem pico neste ciclo`);
+  if (acne >= 3) sig.push('acne frequente nos últimos 60 dias');
+  const n = sig.length;
+  out.push({ id: 'sop', ic: '🧬', title: 'SOP / anovulação', lvl: n === 0 ? 'ok' : n === 1 ? 'info' : n === 2 ? 'warn' : 'warn', pill: n === 0 ? 'Nenhum' : n === 1 ? '1 sinal' : `${n} sinais`, short: n ? sig[0] + (n > 1 ? ` +${n - 1}` : '') : 'Nada compatível nos seus registros',
+    text: n ? `<p>Sinais encontrados nos seus registros:</p><p>${sig.map(x => '• ' + x).join('<br>')}</p><p>Isso é compatível com ciclos irregulares ou sem ovulação, que podem ocorrer na SOP, mas também por tireoide, prolactina, estresse ou peso. <b>Não é diagnóstico</b>: a SOP exige avaliação médica (ciclos irregulares, hormônios e ultrassom).</p>${n >= 2 ? '<p>Vale marcar uma consulta e levar este histórico.</p>' : ''}` : '<p>Seus registros não mostram sinais de ciclos muito longos ou irregulares. Isso não descarta nada: se algo preocupar, converse com seu ginecologista.</p>' });
+  // 4) outros alertas
+  if (day > 90 && !S.settings.pregnancy) out.push({ id: 'amen', ic: '⏳', title: 'Sem menstruar', lvl: 'alert', pill: `${day} dias`, short: 'Mais de 3 meses sem menstruar', text: '<p>Passaram-se mais de 90 dias desde a última menstruação. Procure seu ginecologista.</p>' });
+  const short3 = A.lens.slice(-3).filter(l => l < 21).length;
+  if (short3) out.push({ id: 'short', ic: '⚡', title: 'Ciclo curto', lvl: 'info', pill: 'Menos de 21 dias', short: 'Algum ciclo recente foi mais curto que 21 dias', text: '<p>Ciclos abaixo de 21 dias merecem atenção se forem frequentes. Comente com seu ginecologista.</p>' });
+  const longMens = A.g.slice(-3).filter(x => diff(x.end, x.start) + 1 > 8).length;
+  if (longMens) out.push({ id: 'longm', ic: '🩸', title: 'Menstruação longa', lvl: 'warn', pill: 'Mais de 8 dias', short: 'Sangramento acima de 8 dias em ciclo recente', text: '<p>Pela FIGO, sangramento acima de 8 dias é considerado prolongado. Vale avaliar com seu ginecologista.</p>' });
+  if (A.lutMeasured >= 2 && A.luteal < 10) out.push({ id: 'lut', ic: '📉', title: 'Fase lútea curta', lvl: 'warn', pill: `${A.luteal} dias`, short: 'Menos de 10 dias entre ovulação e menstruação', text: `<p>Sua fase lútea medida é de ${A.luteal} dias, abaixo do esperado (12–14). Se estiver tentando engravidar, comente com seu médico.</p>` });
+  return out;
+}
+const insightInfo = list => Object.fromEntries(list.map(i => ['i_' + i.id, [i.title, i.text + '<p class="note">Observações automáticas a partir dos seus registros, não são diagnóstico.</p>']]));
+function insightsCard(list) {
+  return `<section class="insc"><header><h2>Identificado no seu ciclo</h2><small>toque para ver</small></header>${list.map(i => `<button class="ins ${i.lvl}" data-act="info" data-k="i_${i.id}"><span class="ic">${i.ic}</span><span class="tt"><b>${i.title}</b><small>${i.short}</small></span><span class="pl">${i.pill}</span></button>`).join('')}</section>`;
 }
 
 function vHoje() {
@@ -420,11 +475,13 @@ function vHoje() {
   const ovTile = f?.ev ? [sd(f.ov), f.level2] : f?.ov ? [sd(f.ov), 'estimada'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
   const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['pain', '⚡', 'Dor', (L.symptoms || []).includes('Dor na ovulação')], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não']]
     .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
+  const ins = insights(A);
   INFO = {
     h_mens: ['Previsão da menstruação', `<p>${beyond ? `Seu ciclo está no dia ${day}, além da sua faixa habitual (${A.lo}–${A.hi} dias).` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
     h_ov: ['Ovulação', f?.ev ? `<p>Ovulação <b>${f.level2}</b> em <b>${fmt(f.ov)}</b>, pelos sinais: ${ovSrc(last.start, TODAY)}.</p><p>Janela fértil: ${sr(add(f.ov, -5), add(f.ov, 1))}. Melhores dias: ${sr(add(f.ov, -2), f.ov)}.</p>` : `<p>Ainda sem sinais neste ciclo.</p><p>Registre o <b>muco</b> todo dia, a <b>dor</b> e o <b>teste de LH</b> (comece ${diff(lhDate, TODAY) > 0 ? 'em ' + fmt(lhDate) : 'hoje'}). Cada sinal ajusta a previsão.</p>`],
     h_chance: ['Chance de gravidez hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p><p class="mute small">Estimativa: não serve como método contraceptivo.</p>`],
     h_prec: ['Precisão da previsão', `<p>Precisão <b>${precTxt}</b>.</p><p>${prec === 3 ? 'A ovulação foi confirmada, então a menstruação é prevista com margem de ±2 dias.' : prec === 2 ? 'Baseada no seu histórico. Confirmar a ovulação (LH ou temperatura) deixa a previsão mais certeira.' : 'Poucos ciclos registrados. A previsão melhora a cada ciclo.'}</p>`],
+    ...insightInfo(ins),
     h_alert: ['Atraso', pc?.hasNeg ? `<p>Teste negativo em <b>${fmt(pc.lastNeg)}</b> (${diff(TODAY, pc.lastNeg)} dias atrás). Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>${pc.line}</p><p>Causas comuns: ovulação tardia, estresse, tireoide ou SOP. Sem menstruar até ${fmt(add(last.start, 90))} (3 meses), ou com dor forte/sangramento intenso, procure seu ginecologista.</p>` : `<p>Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>Pode ser ovulação tardia, estresse, SOP ou tireoide, mas <b>gravidez é uma possibilidade</b>. Faça um teste (primeira urina do dia) e registre o resultado. Sem menstruar por 3 meses, procure seu ginecologista.</p>`]
   };
   const banner = beyond && !S.settings.pregnancy ? `<button class="banner" data-act="info" data-k="h_alert"><span>${pc?.hasNeg ? `Teste negativo em ${sd(pc.lastNeg)}` : 'Faça um teste de gravidez'}</span><b>Ver ›</b></button>` : '';
@@ -439,6 +496,7 @@ function vHoje() {
     <div class="ht"><h2>${head}</h2><p>${sub}</p></div></div>
     ${cycleStrip(A, last, F, f, day)}
   </section>
+  ${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${beyond ? 'Atrasada' : sr(F.from, F.to)}</b><em>${beyond ? `dia ${day}` : `provável ${sd(F.center)}`}</em></button>
     <button class="tile" data-act="info" data-k="h_ov"><small>Ovulação</small><b>${ovTile[0]}</b><em>${ovTile[1]}</em></button>
@@ -473,7 +531,7 @@ function vCal() {
   const title = new Date(cal.y, cal.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid">${cells}</div>
-  <div class="legend"><span><i style="background:var(--pink);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--pink)"></i>Faixa provável da menstruação</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--pink)">♥ Sexo</span><span>● Outro registro</span></div>`;
+  <div class="legend"><span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Faixa provável da menstruação</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span></div>`;
 }
 
 function barChart(vals, a) {
