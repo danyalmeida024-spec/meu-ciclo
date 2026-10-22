@@ -320,10 +320,11 @@ function cycleStrip(A, last, F, f, day) {
   <div class="lg"><span><i class="p"></i>Menstruação</span><span><i class="f"></i>Fértil</span><span><i class="o"></i>Ovulação</span><span><i class="w"></i>Previsão</span></div>`;
 }
 
-const goalOf = () => S.settings.pregnancy ? 'pregnant' : (S.settings.goal || 'track');
-function goalSeg() {
-  const g = goalOf();
-  return `<div class="goal" role="tablist" aria-label="Meu objetivo">${[['track', 'Monitorar'], ['conceive', 'Engravidar'], ['pregnant', 'Gestação']].map(([v, l]) => `<button role="tab" aria-selected="${g === v}" class="${g === v ? 'on' : ''}" data-act="goal" data-v="${v}">${l}</button>`).join('')}</div>`;
+const goalOf = () => S.settings.pregnancy ? 'pregnant' : S.settings.goal === 'conceive' ? 'conceive' : 'track';
+function modeSwitch() {
+  if (S.settings.pregnancy) return '';
+  const on = goalOf() === 'conceive';
+  return `<button class="mode ${on ? 'on' : ''}" data-act="conceive" role="switch" aria-checked="${on}" aria-label="Modo engravidar"><span class="mi">🌱</span><span class="mt"><b>Modo engravidar</b><small>${on ? 'Ligado · o app está focado em ovulação e melhores dias' : 'Desligado · toque para focar em engravidar'}</small></span><span class="tr"><i></i></span></button>`;
 }
 function ovMedianDay(A, cur) {
   const a = A.ovSamples.filter(([od]) => od >= cur - 1).sort((x, y) => x[0] - y[0]), tot = a.reduce((t, x) => t + x[1], 0);
@@ -379,7 +380,7 @@ function vHojeConceive(A, last) {
   const since = S.settings.conceiveSince ? A.g.filter(g => g.start >= S.settings.conceiveSince).length : 0;
   return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${goalSeg()}
+  ${modeSwitch()}
   <section class="hh st-${H[0]}">
     <div class="goalpill">🌱 Modo engravidar${since ? ` · ciclo ${since}` : ''}</div>
     <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -431,7 +432,7 @@ function vHoje() {
   const dk = isDark();
   return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${goalSeg()}${pregBanner()}${pos}${banner}
+  ${modeSwitch()}${pregBanner()}${pos}${banner}
   <section class="hh st-${st}">
     <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
     <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -464,8 +465,13 @@ function vCal() {
     const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex') ? '<i></i>' : '';
     cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}<span class="mk">${heart}${dot}</span></button>`;
   }
+  let winCard = '';
+  if (goalOf() === 'conceive' && A.g.length) {
+    const c = conceiveInfo(A);
+    winCard = c.win ? `<div class="wide"><span>Próxima janela fértil</span><b style="font-size:17px">${sr(c.win[0], c.win[1])}</b></div><div class="wide"><span>Melhores dias</span><b style="font-size:17px;color:var(--green)">${sr(c.best[0], c.best[1])}</b></div>` : '<div class="wide"><span>Janela fértil</span><b style="font-size:15px">sem sinais ainda</b></div>';
+  }
   const title = new Date(cal.y, cal.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  return `<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
+  return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid">${cells}</div>
   <div class="legend"><span><i style="background:var(--pink);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--pink)"></i>Faixa provável da menstruação</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--pink)">♥ Sexo</span><span>● Outro registro</span></div>`;
 }
@@ -524,10 +530,24 @@ function signalsCard(A) {
   return `<p style="margin:0 0 6px">Você costuma ovular por volta do <b>dia ${med}</b> do ciclo${days.length > 1 ? ` (entre ${Math.min(...days)} e ${Math.max(...days)})` : ''}. Fase lútea ${A.lutMeasured >= 2 ? 'medida' : 'padrão'}: <b>${A.luteal} dias</b>.</p>${rows}`;
 }
 
+function triesCard(A) {
+  const rows = A.cyc.slice(-6).map(c => {
+    const o = add(c.start, (c.ovDay ?? c.len - A.luteal) - 1);
+    let n = 0; for (let d = add(o, -5); d <= add(o, 1); d = add(d, 1)) if (S.logs[d]?.sex && S.logs[d].sex !== 'Não') n++;
+    return `<div class="row"><span>${sd(c.start)}</span><span class="small"><b>${n}</b> relação(ões) na janela</span></div>`;
+  });
+  const last = A.g.at(-1);
+  if (last) rows.push(`<div class="row"><span>${sd(last.start)} (atual)</span><span class="small"><b>${conceiveInfo(A).tries}</b> relação(ões) na janela</span></div>`);
+  const since = S.settings.conceiveSince ? A.g.filter(g => g.start >= S.settings.conceiveSince).length : 0;
+  return `<div class="card"><h2>Tentativas por ciclo</h2>${rows.join('') || '<p class="mute">Registre as relações para acompanhar.</p>'}${since >= 3 ? '<p class="note">Com ciclos irregulares, não precisa esperar 12 meses: converse com seu ginecologista.</p>' : ''}</div>`;
+}
+
 function vAna() {
   const A = analyze();
   const reg = A.spread == null ? '—' : A.spread <= 7 ? 'Regular' : A.spread <= 9 ? 'Limítrofe' : 'Irregular';
+  const conceive = goalOf() === 'conceive' && A.g.length;
   return `<h1>Análises</h1>
+  ${conceive ? triesCard(A) + `<div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>` : ''}
   <div class="card"><h2>Resumo</h2><div class="stats">
     <div><div class="mute small">Ciclo médio</div><div class="big">${A.n ? A.cycle + ' dias' : '—'}</div></div>
     <div><div class="mute small">Menstruação</div><div class="big">${A.g.length ? A.period + ' dias' : '—'}</div></div>
@@ -537,7 +557,7 @@ function vAna() {
     <div><div class="mute small">Ciclos registrados</div><div class="big">${A.g.length}</div></div>
   </div><p class="note">${A.lutMeasured >= 2 ? 'Fase lútea medida pelas suas ovulações confirmadas.' : 'Fase lútea padrão (14). Com 2+ ovulações confirmadas (LH ou temperatura) o app mede a sua.'}</p></div>
   <div class="card"><h2>Interpretação</h2>${interpret(A)}</div>
-  <div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>
+  ${conceive ? '' : `<div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>`}
   <div class="card"><h2>Duração dos ciclos</h2>${A.lens.length ? barChart(A.lens.slice(-12), avg(A.lens.slice(-12))) : '<p class="mute">Precisa de pelo menos 2 menstruações registradas.</p>'}</div>
   <div class="card"><h2>Temperatura basal (ciclo atual)</h2>${tempChart(A)}</div>
   <div class="card"><h2>Padrões por fase</h2>${patterns(A)}</div>
@@ -547,6 +567,7 @@ function vAna() {
 function vCfg() {
   const s = S.settings;
   return `<h1>Ajustes</h1>
+  ${S.settings.pregnancy ? '' : '<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Já está grávida? Acompanhe semana a semana.</p><button class="btn alt" data-act="startgest">Acompanhar gestação</button></div>'}
   <div class="card"><h2>Valores iniciais</h2><p class="mute small">Usados até o app ter histórico suficiente.</p>
     <div class="two"><div><label class="f">Ciclo (dias)</label><input type="number" min="21" max="45" data-set="cycle" value="${s.cycle}"></div><div><label class="f">Menstruação (dias)</label><input type="number" min="2" max="10" data-set="period" value="${s.period}"></div></div>
     <label class="f">Fase lútea (dias)</label><input type="number" min="10" max="16" data-set="luteal" value="${s.luteal}"></div>
@@ -559,13 +580,15 @@ function vCfg() {
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>`;
 }
 
+function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }
 function updateNav() {
   const g = goalOf(), eng = document.querySelector('[data-tab=eng]'), gest = document.querySelector('[data-tab=gest]');
   if (eng) { eng.hidden = g !== 'conceive'; const sp = eng.querySelector('span'); if (sp) sp.textContent = 'Plano'; }
   if (gest) gest.hidden = g !== 'pregnant';
+  if (g === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal;
 }
 function render() {
-  if ((view === 'eng' && goalOf() !== 'conceive') || (view === 'gest' && goalOf() !== 'pregnant')) view = 'hoje';
+  if (view === 'eng' && goalOf() !== 'conceive') view = 'hoje';
   $main.innerHTML = { hoje: vHoje, cal: vCal, eng: vEng, gest: vGest, ana: vAna, cfg: vCfg, guia: vGuia }[view]();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view));
   updateNav();
@@ -903,7 +926,7 @@ function doImport(txt) {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.go) { view = t.dataset.go; gv = null; if (view === 'gest') { S.settings.goal = 'pregnant'; save(); } render(); scrollTo(0, 0); return; }
+  if (t.dataset.go) { view = t.dataset.go; gv = null; render(); scrollTo(0, 0); return; }
   if (t.dataset.tab) { view = t.dataset.tab; gv = null; render(); scrollTo(0, 0); return; }
   const chip = t.closest('.chip') && t;
   if (chip) {
@@ -920,7 +943,7 @@ document.addEventListener('click', e => {
       const dpp = document.getElementById('dpp').value, dum = document.getElementById('dum').value;
       const d = dpp ? add(dpp, -280) : dum;
       if (!d) { notify('Informe a DUM ou a DPP.'); break; }
-      S.settings.pregnancy = { dum: d }; S.settings.goal = 'pregnant'; save(); render(); break;
+      S.settings.pregnancy = { dum: d }; S.settings.goal = 'track'; save(); render(); break;
     }
     case 'endpreg': ask('Encerrar o acompanhamento da gestação?', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
@@ -940,13 +963,13 @@ document.addEventListener('click', e => {
       if (!Object.keys(Lg).length) delete S.logs[TODAY];
       const y = scrollY; save(); render(); scrollTo(0, y); break;
     }
-    case 'goal': {
-      const v = t.dataset.v;
-      if (v === 'conceive') { S.settings.goal = 'conceive'; if (!S.settings.conceiveSince) S.settings.conceiveSince = TODAY; view = 'hoje'; }
-      else if (v === 'track') { S.settings.goal = 'track'; view = 'hoje'; }
-      else { S.settings.goal = 'pregnant'; view = 'gest'; }
-      save(); render(); scrollTo(0, 0); break;
+    case 'conceive': {
+      const on = S.settings.goal === 'conceive';
+      S.settings.goal = on ? 'track' : 'conceive';
+      if (!on && !S.settings.conceiveSince) S.settings.conceiveSince = TODAY;
+      view = 'hoje'; save(); render(); scrollTo(0, 0); break;
     }
+    case 'startgest': view = 'gest'; render(); scrollTo(0, 0); break;
     case 'close': $sheet.close(); break;
     case 'prev': cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); break;
     case 'next': cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); break;
@@ -994,6 +1017,7 @@ document.addEventListener('input', e => {
 });
 $sheet.addEventListener('click', e => { if (e.target === $sheet) $sheet.close(); });
 
+applyGoal();
 render();
 initCloud();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
