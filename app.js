@@ -159,7 +159,7 @@ function wq(samples, q) {
 function analyze() {
   const g = groups();
   const lens = [];
-  for (let i = 1; i < g.length; i++) { const l = diff(g[i].start, g[i - 1].start); if (l >= 15 && l <= 60) lens.push(l); }
+  for (let i = 1; i < g.length; i++) { const l = diff(g[i].start, g[i - 1].start); if (l >= 15 && l <= 120) lens.push(l); }
   const recent = lens.slice(-8), n = recent.length;
   // ciclos recentes pesam mais; poucos dados => amostras sintéticas ao redor do valor inicial
   let samples = recent.map((v, i) => [v, 0.85 ** (n - 1 - i)]);
@@ -167,13 +167,13 @@ function analyze() {
   if (n < 3) samples = samples.concat([[Math.round(base) - 4, 0.5], [Math.round(base) + 4, 0.5]], n ? [] : [[Math.round(base), 1]]);
   const tw = samples.reduce((t, x) => t + x[1], 0);
   const mean = samples.reduce((t, x) => t + x[0] * x[1], 0) / tw;
-  const cycle = Math.round(mean);
-  const lo = Math.min(wq(samples, .1), cycle - 2), hi = Math.max(wq(samples, .9), cycle + 2);
+  const cycle = Math.round(wq(samples, .5));
+  const lo = Math.min(wq(samples, .1), cycle - 2), hi = Math.max(wq(samples, .8), cycle + 2);
   const plens = g.slice(0, -1).map(x => diff(x.end, x.start) + 1).concat(g.length && diff(g.at(-1).end, g.at(-1).start) >= 1 ? [diff(g.at(-1).end, g.at(-1).start) + 1] : []);
   const period = plens.length ? Math.round(avg(plens.slice(-6))) : S.settings.period;
   const cyc = [], lut = [];
   for (let i = 1; i < g.length; i++) {
-    const len = diff(g[i].start, g[i - 1].start); if (len < 15 || len > 60) continue;
+    const len = diff(g[i].start, g[i - 1].start); if (len < 15 || len > 120) continue;
     const e = ovEst(g[i - 1].start, add(g[i].start, -1)), ok = e && e.level !== 'iminente';
     const ovDay = ok ? diff(e.date, g[i - 1].start) + 1 : null;
     cyc.push({ start: g[i - 1].start, len, ovDay, level: e?.level, src: e?.src });
@@ -191,22 +191,34 @@ function analyze() {
 
 // probabilidade (0–1) de o dia do ciclo estar na janela fértil, segundo o dia em que você costuma ovular.
 // Só considera ciclos em que a ovulação ainda não tinha ocorrido até o dia atual (cur). null = fora de tudo que já vi.
-function fertProb(A, day, cur = day) {
-  let num = 0, den = 0;
-  for (const [od, w] of A.ovSamples) { if (od < cur - 1) continue; den += w; if (day >= od - 5 && day <= od + 1) num += w; }
-  return den ? num / den : null;
+function fertProbN(A, day, cur = day) {
+  let num = 0, den = 0, n = 0;
+  for (const [od, w] of A.ovSamples) { if (od < cur - 1) continue; den += w; n++; if (day >= od - 5 && day <= od + 1) num += w; }
+  return { p: den ? num / den : null, n };
 }
+const fertProb = (A, day, cur = day) => fertProbN(A, day, cur).p;
 
 // previsão da próxima menstruação: faixa; se a ovulação já foi confirmada, a faixa fica bem mais estreita
 function nextPeriod(A) {
-  const last = A.g.at(-1), e = ovEst(last.start, TODAY);
-  if (e) { const c = add(e.date, A.luteal), hw = e.level === 'confirmada' ? 2 : e.level === 'provável' ? 3 : 4; return { center: c, from: add(c, -hw), to: add(c, hw), confirmed: e.level === 'confirmada', level: e.level, src: e.src.join(' + '), ov: e.date }; }
-  return { center: add(last.start, A.cycle), from: add(last.start, A.lo), to: add(last.start, A.hi), confirmed: false };
+  const last = A.g.at(-1), e = ovEst(last.start, TODAY), day = diff(TODAY, last.start) + 1;
+  if (e) {
+    const c = add(e.date, A.luteal), hw = e.level === 'confirmada' ? 2 : e.level === 'provável' ? 3 : 4, to = add(c, hw);
+    return { center: c, from: add(c, -hw), to, confirmed: e.level === 'confirmada', level: e.level, src: e.src.join(' + '), ov: e.date, late: TODAY > to, over: Math.max(diff(TODAY, to), 0), typTo: to };
+  }
+  const typTo = add(last.start, A.hi);
+  if (TODAY <= typTo) return { center: add(last.start, A.cycle), from: add(last.start, A.lo), to: typTo, confirmed: false, late: false, over: 0, typTo };
+  // passou da faixa habitual: baseia-se nos seus ciclos anteriores que também passaram deste dia
+  const over = diff(TODAY, typTo), cond = A.samples.filter(([L]) => L >= day);
+  if (cond.length) {
+    const ls = cond.map(x => x[0]);
+    return { center: add(last.start, wq(cond, .5)), from: add(last.start, Math.max(Math.min(...ls), day - 1)), to: add(last.start, Math.max(...ls)), confirmed: false, late: true, over, typTo, extended: true, base: cond.length };
+  }
+  return { center: add(TODAY, 7), from: TODAY, to: add(TODAY, 14), confirmed: false, late: true, over, typTo, extended: true, nobase: true };
 }
 const isRegular = A => A.n >= 3 && A.hi - A.lo <= 6;
 
 function marks(A) {
-  const per = new Set(), pper = new Set(), fert = new Map(), ov = new Set(), late = new Set();
+  const per = new Set(), pper = new Set(), pper2 = new Set(), fert = new Map(), ov = new Set(), late = new Set();
   A.g.forEach(x => { for (let d = x.start; d <= x.end; d = add(d, 1)) per.add(d); });
   const mark = o => { ov.add(o); for (let k = -5; k <= 1; k++) fert.set(add(o, k), 1); };
   A.g.forEach((x, i) => {
@@ -215,18 +227,25 @@ function marks(A) {
   });
   const last = A.g.at(-1);
   if (last) {
-    const F = nextPeriod(A), e = ovEst(last.start, TODAY);
-    for (let d = F.from; d <= F.to; d = add(d, 1)) pper.add(d);
-    if (TODAY > F.to) for (let d = add(F.to, 1); d <= TODAY; d = add(d, 1)) late.add(d);
+    const F = nextPeriod(A), e = ovEst(last.start, TODAY), cur = diff(TODAY, last.start) + 1;
+    if (!F.nobase) for (let d = F.from; d <= F.to; d = add(d, 1)) pper.add(d);
+    if (F.late && !F.extended) for (let d = add(F.typTo, 1); d <= TODAY; d = add(d, 1)) late.add(d);
+    if (F.late && F.extended) for (let d = add(F.typTo, 1); d <= TODAY; d = add(d, 1)) late.add(d);
     if (e) mark(e.date);
     else if (isRegular(A)) {
       for (let k = 1; k <= 3; k++) { const ns = add(last.start, k * A.cycle); mark(add(ns, -A.luteal)); if (k > 1) for (let j = 0; j < A.period; j++) pper.add(add(ns, j)); }
-    } else if (TODAY <= F.to) {
-      const cur = diff(TODAY, last.start) + 1;
-      for (let i = Math.max(cur - 1, 0); i <= A.hi; i++) { const p = fertProb(A, i + 1, cur); if (p !== null && p >= .15) fert.set(add(last.start, i), p); }
+    } else {
+      const maxOd = Math.max(...A.ovSamples.map(x => x[0]));
+      for (let i = Math.max(cur - 1, 0); i <= maxOd + 2; i++) { const p = fertProb(A, i + 1, cur); if (p !== null && p >= .15) fert.set(add(last.start, i), p); }
+    }
+    // ciclo seguinte: previsto a partir da menstruação prevista + mediana dos seus ciclos
+    if (!isRegular(A) && !F.nobase) {
+      const c2 = F.center;
+      for (let d = add(c2, A.lo); d <= add(c2, A.hi); d = add(d, 1)) pper2.add(d);
+      for (let i = 0; i <= A.hi + 2; i++) { const p = fertProb(A, i + 1, 0); if (p !== null && p >= .45) { const dd = add(c2, i); if (!fert.has(dd)) fert.set(dd, p * .7); } }
     }
   }
-  return { per, pper, fert, ov, late };
+  return { per, pper, pper2, fert, ov, late };
 }
 
 function phaseOf(date, A) {
@@ -257,19 +276,19 @@ function fertility(A) {
     if (d < -1) return { ...base, level: 'Baixa', txt: `Ovulação já ocorreu (${src})` };
     return { ...base, level: 'Alta', txt: `Ovulação ${tag} em ${sd(o)}` };
   }
-  if (TODAY > F.to) return { level: 'Incerta', beyond: true, txt: `Dia ${day}, além do seu padrão: ovulação incerta` };
-  const p = fertProb(A, day);
-  if (p === null) return { level: 'Incerta', txt: 'Passou do seu dia habitual de ovulação' };
+  const { p, n } = fertProbN(A, day);
+  if (p === null) return { level: 'Incerta', txt: `Dia ${day}, além de tudo que já vi nos seus ciclos: ovulação incerta` };
   let level = p >= .5 ? 'Alta' : p >= .2 ? 'Média' : 'Baixa';
+  if (n < 2 && level === 'Alta') level = 'Média';
   if (mucus) level = 'Alta';
   const ov = isRegular(A) ? add(add(last.start, A.cycle), -A.luteal) : null;
-  return { level, p, ov, txt: `${Math.round(p * 100)}% dos seus ciclos estariam férteis hoje` };
+  return { level, p, ov, txt: n < 2 ? 'Baseado em só 1 ciclo parecido do seu histórico' : `${Math.round(p * 100)}% dos ciclos parecidos estariam férteis hoje` };
 }
 
 // chance (%) de a menstruação chegar nos próximos `days` dias
 function periodProb(A, F, days) {
   const last = A.g.at(-1), day = diff(TODAY, last.start) + 1;
-  if (TODAY > F.to) return null;
+  if (F.nobase) return null;
   if (F.level) {
     const from = Math.max(diff(F.from, TODAY), 0), to = diff(F.to, TODAY);
     if (to < from) return null;
@@ -300,7 +319,7 @@ let view = 'hoje';
 let cal = { y: new Date().getFullYear(), m: new Date().getMonth() };
 
 function cycleStrip(A, last, F, f, day) {
-  const plen = Math.max(diff(last.end, last.start) + 1, 1), beyond = TODAY > F.to;
+  const plen = Math.max(diff(last.end, last.start) + 1, 1), beyond = F.late;
   const span = Math.min(Math.max(diff(F.to, last.start) + 3, day + 3, 20), 70);
   const ovDay = f?.ov ? diff(f.ov, last.start) + 1 : null, wFrom = diff(F.from, last.start) + 1, wTo = diff(F.to, last.start) + 1;
   let cells = '';
@@ -309,7 +328,7 @@ function cycleStrip(A, last, F, f, day) {
     if (d <= plen) c.push('p');
     let p = 0;
     if (ovDay && d >= ovDay - 5 && d <= ovDay + 1) p = 1;
-    else if (!ovDay && !beyond && d >= day) p = fertProb(A, d, day) ?? 0;
+    else if (!ovDay && d >= day) p = fertProb(A, d, day) ?? 0;
     if (p >= .15 && d > plen) c.push('f');
     if (d === ovDay) c.push('o');
     if (d >= wFrom && d <= wTo) c.push('w');
@@ -333,11 +352,11 @@ function ovMedianDay(A, cur) {
 }
 // tudo o que o modo "engravidar" precisa saber do ciclo atual
 function conceiveInfo(A) {
-  const last = A.g.at(-1), day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), e = ovEst(last.start, TODAY), beyond = TODAY > F.to;
+  const last = A.g.at(-1), day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), e = ovEst(last.start, TODAY), beyond = F.late;
   let ov = null, src = null;
   if (e) { ov = e.date; src = e.level; }
   else if (isRegular(A)) { ov = add(add(last.start, A.cycle), -A.luteal); src = 'estimada'; }
-  else if (!beyond) { const m = ovMedianDay(A, day); if (m !== null) { ov = add(last.start, m - 1); src = 'estimada'; } }
+  else { const m = ovMedianDay(A, day); if (m !== null) { ov = add(last.start, m - 1); src = 'estimada'; } }
   const win = ov ? [add(ov, -5), add(ov, 1)] : null, best = ov ? [add(ov, -2), ov] : null;
   const ph = phaseOf(TODAY, A), testDate = F.level ? F.center : F.from;
   let st;
@@ -355,7 +374,7 @@ function conceiveInfo(A) {
 
 function vHojeConceive(A, last) {
   const c = conceiveInfo(A), { day, F, f, win, best, ov, src, testDate, st, tries } = c, pc = pregCheck(A);
-  const over = diff(TODAY, F.to), tdays = diff(testDate, TODAY), L = S.logs[TODAY] || {};
+  const over = F.over, tdays = diff(testDate, TODAY), L = S.logs[TODAY] || {};
   const toWin = win ? diff(win[0], TODAY) : null;
   const H = {
     best: ['fert', 'Hoje é dia de tentar', `Chance ${(f?.level || 'alta').toLowerCase()}${ov ? ' · ovulação ' + sd(ov) : ''}`, 'Tenham relações hoje e amanhã: o óvulo vive cerca de 24 h.'],
@@ -407,7 +426,7 @@ function vHojeConceive(A, last) {
 // ---------- o que o app identificou no ciclo ----------
 // Observações calculadas só a partir do que você registrou. Não são diagnóstico.
 function insights(A) {
-  const last = A.g.at(-1), out = [], F = nextPeriod(A), beyond = TODAY > F.to, over = diff(TODAY, F.to), day = diff(TODAY, last.start) + 1, pc = pregCheck(A);
+  const last = A.g.at(-1), out = [], F = nextPeriod(A), beyond = F.late, over = F.over, day = diff(TODAY, last.start) + 1, pc = pregCheck(A);
   const exp = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex)).sort();
   const posRecent = Object.keys(S.logs).some(d => S.logs[d].test === 'Positivo' && diff(TODAY, d) <= 21);
   // 1) possibilidade de gravidez
@@ -461,10 +480,10 @@ function vHoje() {
   if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Registre o <b>primeiro dia da última menstruação</b> (ou importe seu histórico em Ajustes).</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
   if (goalOf() === 'conceive') return vHojeConceive(A, last);
   const day = diff(TODAY, last.start) + 1, F = nextPeriod(A), f = fertility(A), pc = pregCheck(A), ph = phaseOf(TODAY, A);
-  const beyond = TODAY > F.to, over = diff(TODAY, F.to), tdays = diff(F.center, TODAY);
+  const beyond = F.late, over = F.over, tdays = diff(F.center, TODAY);
   const prec = F.confirmed ? 3 : F.level ? 2 : A.n >= 3 ? 2 : 1, precTxt = ['', 'Baixa', 'Média', 'Alta'][prec];
   let st, head, sub;
-  if (beyond) { st = 'late'; head = `${over} dia${over > 1 ? 's' : ''} de atraso`; sub = `Seu padrão: ${A.lo}–${A.hi} dias`; }
+  if (beyond) { st = 'late'; head = `${over} dia${over > 1 ? 's' : ''} de atraso`; sub = A.max > A.hi ? `Habitual ${A.lo}–${A.hi} dias · você já teve ${A.max}` : `Seu padrão: ${A.lo}–${A.hi} dias`; }
   else if (ph === 'menstrual') { st = 'mens'; head = 'Menstruação'; sub = `Dia ${day}`; }
   else if (f && ['Alta', 'Muito alta'].includes(f.level)) { st = 'fert'; head = f.level === 'Muito alta' ? 'Pico de fertilidade' : 'Janela fértil'; sub = f.ov ? `Ovulação ${sd(f.ov)}` : `Chance ${f.level.toLowerCase()}`; }
   else { st = ph === 'lutea' ? 'lut' : 'fol'; head = PHASE[ph] || 'Ciclo'; sub = tdays > 0 ? `Menstruação em ~${tdays}d` : 'Menstruação hoje'; }
@@ -472,12 +491,12 @@ function vHoje() {
   const pr = periodProb(A, F, 7), L = S.logs[TODAY] || {};
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
-  const ovTile = f?.ev ? [sd(f.ov), f.level2] : f?.ov ? [sd(f.ov), 'estimada'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
+  const ci = conceiveInfo(A), ovTile = f?.ev ? [sd(f.ov), f.level2] : ci.ov ? [sd(ci.ov), 'estimada pelos seus ciclos'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
   const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['pain', '⚡', 'Dor', (L.symptoms || []).includes('Dor na ovulação')], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não']]
     .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
   const ins = insights(A);
   INFO = {
-    h_mens: ['Previsão da menstruação', `<p>${beyond ? `Seu ciclo está no dia ${day}, além da sua faixa habitual (${A.lo}–${A.hi} dias).` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
+    h_mens: ['Previsão da menstruação', `<p>${F.nobase ? `Seu ciclo está no dia ${day}, mais longo que todos os que já registrei.` : F.extended ? `Seu ciclo passou da faixa habitual (${A.lo}–${A.hi} dias). Usei ${F.base} ciclo(s) anterior(es) que também passaram do dia ${day}: previsão <b>${sr(F.from, F.to)}</b>, mais provável <b>${sd(F.center)}</b>.` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
     h_ov: ['Ovulação', f?.ev ? `<p>Ovulação <b>${f.level2}</b> em <b>${fmt(f.ov)}</b>, pelos sinais: ${ovSrc(last.start, TODAY)}.</p><p>Janela fértil: ${sr(add(f.ov, -5), add(f.ov, 1))}. Melhores dias: ${sr(add(f.ov, -2), f.ov)}.</p>` : `<p>Ainda sem sinais neste ciclo.</p><p>Registre o <b>muco</b> todo dia, a <b>dor</b> e o <b>teste de LH</b> (comece ${diff(lhDate, TODAY) > 0 ? 'em ' + fmt(lhDate) : 'hoje'}). Cada sinal ajusta a previsão.</p>`],
     h_chance: ['Chance de gravidez hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p><p class="mute small">Estimativa: não serve como método contraceptivo.</p>`],
     h_prec: ['Precisão da previsão', `<p>Precisão <b>${precTxt}</b>.</p><p>${prec === 3 ? 'A ovulação foi confirmada, então a menstruação é prevista com margem de ±2 dias.' : prec === 2 ? 'Baseada no seu histórico. Confirmar a ovulação (LH ou temperatura) deixa a previsão mais certeira.' : 'Poucos ciclos registrados. A previsão melhora a cada ciclo.'}</p>`],
@@ -498,7 +517,7 @@ function vHoje() {
   </section>
   ${insightsCard(ins)}
   <div class="tiles4">
-    <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${beyond ? 'Atrasada' : sr(F.from, F.to)}</b><em>${beyond ? `dia ${day}` : `provável ${sd(F.center)}`}</em></button>
+    <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${F.nobase ? 'Sem base' : sr(F.from, F.to)}</b><em>${F.nobase ? `dia ${day}, além do histórico` : F.extended ? `ciclos longos: ~${sd(F.center)}` : `provável ${sd(F.center)}`}</em></button>
     <button class="tile" data-act="info" data-k="h_ov"><small>Ovulação</small><b>${ovTile[0]}</b><em>${ovTile[1]}</em></button>
     <button class="tile" data-act="info" data-k="h_chance"><small>Chance hoje</small><b style="color:${col}">${f ? f.level : '—'}</b><em>${f?.p != null ? Math.round(f.p * 100) + '% dos ciclos' : f?.ev ? 'ovulação ' + f.level2 : ''}</em></button>
     <button class="tile" data-act="info" data-k="h_mens"><small>Menstrua em 7 dias</small><b>${pr == null ? '—' : pr + '%'}</b><em>${pr == null ? 'fora do padrão' : 'de chance'}</em></button>
@@ -518,20 +537,21 @@ function vCal() {
   for (let d = 1; d <= n; d++) {
     const s = iso(new Date(cal.y, cal.m, d, 12));
     const L = S.logs[s] || {};
-    const c = ['d', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
+    const c = ['d', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
     const heart = L.sex && L.sex !== 'Não' ? '<b>♥</b>' : '';
     const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex') ? '<i></i>' : '';
     cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}<span class="mk">${heart}${dot}</span></button>`;
   }
   let winCard = '';
-  if (goalOf() === 'conceive' && A.g.length) {
-    const c = conceiveInfo(A);
-    winCard = c.win ? `<div class="wide"><span>Próxima janela fértil</span><b style="font-size:17px">${sr(c.win[0], c.win[1])}</b></div><div class="wide"><span>Melhores dias</span><b style="font-size:17px;color:var(--green)">${sr(c.best[0], c.best[1])}</b></div>` : '<div class="wide"><span>Janela fértil</span><b style="font-size:15px">sem sinais ainda</b></div>';
+  if (A.g.length) {
+    const c = conceiveInfo(A), F = c.F;
+    const win = c.win ? sr(c.win[0], c.win[1]) : '—', best = c.best ? sr(c.best[0], c.best[1]) : '';
+    winCard = `<div class="predrow"><div class="pred p1"><small>Próxima menstruação</small><b>${F.nobase ? 'Sem base' : sr(F.from, F.to)}</b><em>${F.nobase ? 'além do histórico' : `provável ${sd(F.center)}`}</em></div><div class="pred p2"><small>Período fértil</small><b>${win}</b><em>${best ? `melhores dias ${best}` : 'sem estimativa'}</em></div></div><p class="basis">Previsão com base nos seus ${A.n} ciclos (${A.min ?? '—'} a ${A.max ?? '—'} dias)${F.extended && !F.nobase ? ` · como o ciclo passou do habitual, usei seus ciclos longos` : ''}.</p>`;
   }
   const title = new Date(cal.y, cal.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid">${cells}</div>
-  <div class="legend"><span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Faixa provável da menstruação</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span></div>`;
+  <div class="legend"><span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span></div>`;
 }
 
 function barChart(vals, a) {
@@ -607,7 +627,7 @@ function vAna() {
   return `<h1>Análises</h1>
   ${conceive ? triesCard(A) + `<div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>` : ''}
   <div class="card"><h2>Resumo</h2><div class="stats">
-    <div><div class="mute small">Ciclo médio</div><div class="big">${A.n ? A.cycle + ' dias' : '—'}</div></div>
+    <div><div class="mute small">Ciclo médio</div><div class="big">${A.n ? Math.round(A.mean) + ' dias' : '—'}</div></div>
     <div><div class="mute small">Menstruação</div><div class="big">${A.g.length ? A.period + ' dias' : '—'}</div></div>
     <div><div class="mute small">Faixa habitual</div><div class="big">${A.n ? `${A.lo}–${A.hi}` : '—'}</div></div>
     <div><div class="mute small">Regularidade</div><div class="big">${reg}</div></div>
@@ -932,7 +952,7 @@ const CHECK_E = ['Marcar consulta pré-concepcional', 'Começar o ácido fólico
 function vEng() {
   const A = analyze(), last = A.g.at(-1), f = fertility(A);
   if (!last) return `<h1>Engravidar 🌱</h1><div class="card"><p>Registre ou importe pelo menos uma menstruação para eu calcular seus dias de ovulação.</p></div>`;
-  const F = nextPeriod(A), beyond = TODAY > F.to, pc = pregCheck(A);
+  const F = nextPeriod(A), beyond = F.late, pc = pregCheck(A);
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
   const ovLo = add(last.start, A.lo - A.luteal), ovHi = add(last.start, A.hi - A.luteal);
   let plan;
