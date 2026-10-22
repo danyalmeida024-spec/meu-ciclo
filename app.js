@@ -829,5 +829,19 @@ render();
 initCloud();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
 
+// link pessoal de importação: https://.../#import=<dados em base64>. Os dados ficam no link (nunca no repositório) e o link é limpo da barra depois de usado.
+(function importFromLink() {
+  const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try {
+    const x = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!x.logs) throw 0;
+    if (Object.keys(S.logs).length) { notify('Este aparelho já tem dados. Para substituir pelo histórico do link, use Ajustes → Importar backup.'); return; }
+    S = norm(x); save(); render();
+    notify('Histórico importado: ' + Object.keys(S.logs).length + ' dias de registro.');
+  } catch { notify('Não consegui ler o link de importação.'); }
+})();
+
 // se o app ficou aberto de um dia para o outro, recarrega para atualizar "hoje"
 document.addEventListener('visibilitychange', () => { if (!document.hidden && iso(new Date()) !== TODAY) location.reload(); });
