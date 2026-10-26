@@ -265,3 +265,9 @@ dialog.full[open]{display:flex;flex-direction:column}
 .pred small{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.9}.pred b{font-size:21px;font-weight:800;line-height:1.15;letter-spacing:-.02em}.pred em{font-style:normal;font-size:12px;opacity:.92}
 .basis{font-size:12px;color:var(--mute);margin:2px 2px 12px}
 .d.pper2{background:none;border:2px dotted var(--rose);color:var(--rose);opacity:.75}
+
+/* ---- calendário: dia de hoje em destaque ---- */
+.d.today{border:0;background:linear-gradient(135deg,#a98bff,var(--pink)) !important;color:#fff !important;font-weight:800;box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--pink),0 8px 16px -6px var(--pink);z-index:1}
+.d.today::before{content:"HOJE";display:block !important;position:absolute;top:5px;left:0;right:0;text-align:center;font-size:7px;letter-spacing:.08em;font-weight:800;opacity:.92}
+.d.today .mk b{color:#fff}.d.today .mk i{background:#ffffffcc}
+:root[data-goal="conceive"] .d.today{background:linear-gradient(135deg,#34d3ae,#1d9f86) !important;box-shadow:0 0 0 3px var(--bg),0 0 0 5px #1d9f86,0 8px 16px -6px #1d9f86}
