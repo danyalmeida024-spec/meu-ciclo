@@ -271,3 +271,6 @@ dialog.full[open]{display:flex;flex-direction:column}
 .d.today::before{content:"HOJE";display:block !important;position:absolute;top:5px;left:0;right:0;text-align:center;font-size:7px;letter-spacing:.08em;font-weight:800;opacity:.92}
 .d.today .mk b{color:#fff}.d.today .mk i{background:#ffffffcc}
 :root[data-goal="conceive"] .d.today{background:linear-gradient(135deg,#34d3ae,#1d9f86) !important;box-shadow:0 0 0 3px var(--bg),0 0 0 5px #1d9f86,0 8px 16px -6px #1d9f86}
+
+.mk u{text-decoration:none;font-size:8px;line-height:1}.mk s{text-decoration:none;display:block;width:5px;height:5px;border-radius:50%;background:var(--rose);opacity:.7}
+.d.today .mk s{background:#fff}

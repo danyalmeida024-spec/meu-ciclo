@@ -156,10 +156,18 @@ function wq(samples, q) {
   return a.at(-1)[0];
 }
 
+// Pílula: sequências de dias seguidos com "Anticoncepcional" nos remédios. A proteção só vale a partir do 8º dia seguido.
+function pillRuns() {
+  const days = Object.keys(S.logs).filter(d => (S.logs[d].meds || []).includes('Anticoncepcional')).sort(), runs = [];
+  for (const d of days) { const r = runs.at(-1); if (r && diff(d, r.end) <= 1) r.end = d; else runs.push({ start: d, end: d }); }
+  return runs.map(r => ({ ...r, days: diff(r.end, r.start) + 1 }));
+}
+const pillCovered = (date, runs = pillRuns()) => runs.some(r => date >= add(r.start, 7) && date <= r.end);
+
 function analyze() {
   const g = groups();
-  const lens = [];
-  for (let i = 1; i < g.length; i++) { const l = diff(g[i].start, g[i - 1].start); if (l >= 15 && l <= 120) lens.push(l); }
+  const runs = pillRuns(), hormonal = (a, b) => runs.some(r => r.start < b && r.end >= a), lens = [];
+  for (let i = 1; i < g.length; i++) { const l = diff(g[i].start, g[i - 1].start); if (l >= 15 && l <= 120 && !hormonal(g[i - 1].start, g[i].start)) lens.push(l); }
   const recent = lens.slice(-8), n = recent.length;
   // ciclos recentes pesam mais; poucos dados => amostras sintéticas ao redor do valor inicial
   let samples = recent.map((v, i) => [v, 0.85 ** (n - 1 - i)]);
@@ -173,7 +181,7 @@ function analyze() {
   const period = plens.length ? Math.round(avg(plens.slice(-6))) : S.settings.period;
   const cyc = [], lut = [];
   for (let i = 1; i < g.length; i++) {
-    const len = diff(g[i].start, g[i - 1].start); if (len < 15 || len > 120) continue;
+    const len = diff(g[i].start, g[i - 1].start); if (len < 15 || len > 120 || hormonal(g[i - 1].start, g[i].start)) continue;
     const e = ovEst(g[i - 1].start, add(g[i].start, -1)), ok = e && e.level !== 'iminente';
     const ovDay = ok ? diff(e.date, g[i - 1].start) + 1 : null;
     cyc.push({ start: g[i - 1].start, len, ovDay, level: e?.level, src: e?.src });
@@ -186,7 +194,13 @@ function analyze() {
   if (rc.length < 3) ovSamples = ovSamples.concat([[Math.round(base) - luteal - 4, 0.5], [Math.round(base) - luteal + 4, 0.5]], rc.length ? [] : [[Math.round(base) - luteal, 1]]);
   const sd = recent.length > 1 ? Math.sqrt(avg(recent.map(x => (x - avg(recent)) ** 2))) : null;
   const min = lens.length ? Math.min(...lens) : null, max = lens.length ? Math.max(...lens) : null;
-  return { g, lens, n, samples, cyc, ovSamples, mean, cycle, lo, hi, period, luteal, lutMeasured: lut.length, sd, min, max, spread: n >= 2 ? Math.max(...recent) - Math.min(...recent) : null };
+  // pílula tomada neste ciclo: o ciclo atual fica de fora das estatísticas e dos sinais de SOP
+  const lastG = g.at(-1), curRuns = lastG ? runs.filter(x => x.end >= lastG.start) : [];
+  const pill = curRuns.length ? (() => {
+    const run = curRuns.at(-1), esc = Object.keys(S.logs).filter(d => d > run.end && diff(d, run.end) <= 21 && ['spot', 'light', 'med', 'heavy'].includes(S.logs[d].flow) && !g.some(x => d >= x.start && d <= x.end)).sort();
+    return { run, stopped: diff(TODAY, run.end) >= 2, effective: run.days >= 7, escape: esc };
+  })() : null;
+  return { pill, g, lens, n, samples, cyc, ovSamples, mean, cycle, lo, hi, period, luteal, lutMeasured: lut.length, sd, min, max, spread: n >= 2 ? Math.max(...recent) - Math.min(...recent) : null };
 }
 
 // probabilidade (0–1) de o dia do ciclo estar na janela fértil, segundo o dia em que você costuma ovular.
@@ -306,7 +320,7 @@ function pregCheck(A) {
   if (!last) return null;
   const neg = Object.keys(S.logs).filter(d => d >= last.start && S.logs[d].test === 'Negativo').sort();
   if (!neg.length) return { hasNeg: false };
-  const exposures = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex)).sort();
+  const exposures = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
   const unc = exposures.filter(e => !neg.some(t => diff(t, e) >= 14));
   const lastNeg = neg.at(-1), until = add(lastNeg, -14), allClear = unc.length ? add(unc.at(-1), 14) : null, fd = d => fmt(d).replace(/\.$/, '');
   const line = !unc.length ? 'O teste cobre todas as relações registradas neste ciclo: gravidez muito improvável.'
@@ -427,7 +441,7 @@ function vHojeConceive(A, last) {
 // Observações calculadas só a partir do que você registrou. Não são diagnóstico.
 function insights(A) {
   const last = A.g.at(-1), out = [], F = nextPeriod(A), beyond = F.late, over = F.over, day = diff(TODAY, last.start) + 1, pc = pregCheck(A);
-  const exp = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex)).sort();
+  const exp = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
   const posRecent = Object.keys(S.logs).some(d => S.logs[d].test === 'Positivo' && diff(TODAY, d) <= 21);
   // 1) possibilidade de gravidez
   let g;
@@ -444,6 +458,15 @@ function insights(A) {
       : { lvl: 'ok', pill: 'Baixa', short: 'Relações fora da janela fértil estimada', text: '<p>As relações sem proteção registradas ficaram fora da janela fértil estimada. A estimativa pode errar em ciclos irregulares.</p>' };
   }
   out.push({ id: 'preg', ic: '🤰', title: 'Gravidez', ...g });
+  if (A.pill) {
+    const { run, stopped, effective, escape } = A.pill, exs = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex)).length;
+    out.push({ id: 'pill', ic: '💊', title: 'Pílula', lvl: stopped ? 'warn' : 'info', pill: stopped ? 'Interrompida' : 'Em uso',
+      short: `${run.days} dia${run.days > 1 ? 's' : ''} (${sr(run.start, run.end)})${effective ? '' : ' · sem proteção'}${escape.length ? ` · escape ${sr(escape[0], escape.at(-1))}` : ''}`,
+      text: `<p>Você tomou a pílula por <b>${run.days} dia${run.days > 1 ? 's' : ''}</b> (${sr(run.start, run.end)}).${effective ? '' : ' São necessários <b>7 dias seguidos</b> para a pílula proteger contra gravidez: neste período ela <b>não protegeu</b>.'}</p>`
+        + (escape.length ? `<p>O sangramento de <b>${sr(escape[0], escape.at(-1))}</b> (${escape.length} dias) é compatível com <b>escape / sangramento de privação</b> depois de parar a pílula. Isso <b>não é menstruação</b> e não conta como início de ciclo.</p>` : '')
+        + `<p>Depois de parar a pílula, a ovulação pode demorar semanas para voltar. Por isso o <b>ciclo atual (dia ${day})</b> foi tirado das estatísticas e dos sinais de SOP: ele não mostra o seu padrão natural.</p>`
+        + (exs ? `<p>As <b>${exs}</b> relação(ões) deste ciclo seguem contando como sem proteção.</p>` : '') });
+  }
   // 2) regularidade
   const sp = A.spread;
   out.push(sp == null ? { id: 'reg', ic: '🔁', title: 'Regularidade', lvl: 'info', pill: 'Poucos ciclos', short: 'Registre mais ciclos para avaliar', text: '<p>Preciso de pelo menos 3 menstruações registradas para avaliar a regularidade.</p>' }
@@ -455,12 +478,12 @@ function insights(A) {
   const sig = [];
   if (sp != null && sp >= 10) sig.push(`ciclos irregulares (variação de ${sp} dias)`);
   if (longs >= 2 || gaps.some(x => x > 45)) sig.push(`ciclos longos (${longs ? longs + ' acima de 35 dias' : 'intervalo acima de 45 dias'})`);
-  if (day > 45 && !S.settings.pregnancy) sig.push(`ciclo atual com ${day} dias`);
+  if (day > 45 && !S.settings.pregnancy && !A.pill) sig.push(`ciclo atual com ${day} dias`);
   if (lhNeg >= 5 && !lhPos && day > 20) sig.push(`${lhNeg} testes de LH negativos sem pico neste ciclo`);
   if (acne >= 3) sig.push('acne frequente nos últimos 60 dias');
   const n = sig.length;
   out.push({ id: 'sop', ic: '🧬', title: 'SOP / anovulação', lvl: n === 0 ? 'ok' : n === 1 ? 'info' : n === 2 ? 'warn' : 'warn', pill: n === 0 ? 'Nenhum' : n === 1 ? '1 sinal' : `${n} sinais`, short: n ? sig[0] + (n > 1 ? ` +${n - 1}` : '') : 'Nada compatível nos seus registros',
-    text: n ? `<p>Sinais encontrados nos seus registros:</p><p>${sig.map(x => '• ' + x).join('<br>')}</p><p>Isso é compatível com ciclos irregulares ou sem ovulação, que podem ocorrer na SOP, mas também por tireoide, prolactina, estresse ou peso. <b>Não é diagnóstico</b>: a SOP exige avaliação médica (ciclos irregulares, hormônios e ultrassom).</p>${n >= 2 ? '<p>Vale marcar uma consulta e levar este histórico.</p>' : ''}` : '<p>Seus registros não mostram sinais de ciclos muito longos ou irregulares. Isso não descarta nada: se algo preocupar, converse com seu ginecologista.</p>' });
+    text: n ? `<p>Sinais encontrados nos seus registros:</p><p>${sig.map(x => '• ' + x).join('<br>')}</p><p>Isso é compatível com ciclos irregulares ou sem ovulação, que podem ocorrer na SOP, mas também por tireoide, prolactina, estresse ou peso. <b>Não é diagnóstico</b>: a SOP exige avaliação médica (ciclos irregulares, hormônios e ultrassom).</p>${A.pill ? '<p>O ciclo atual, influenciado pela pílula, não foi contado.</p>' : ''}${n >= 2 ? '<p>Vale marcar uma consulta e levar este histórico.</p>' : ''}` : '<p>Seus registros não mostram sinais de ciclos muito longos ou irregulares. Isso não descarta nada: se algo preocupar, converse com seu ginecologista.</p>' });
   // 4) outros alertas
   if (day > 90 && !S.settings.pregnancy) out.push({ id: 'amen', ic: '⏳', title: 'Sem menstruar', lvl: 'alert', pill: `${day} dias`, short: 'Mais de 3 meses sem menstruar', text: '<p>Passaram-se mais de 90 dias desde a última menstruação. Procure seu ginecologista.</p>' });
   const short3 = A.lens.slice(-3).filter(l => l < 21).length;
@@ -483,7 +506,7 @@ function vHoje() {
   const beyond = F.late, over = F.over, tdays = diff(F.center, TODAY);
   const prec = F.confirmed ? 3 : F.level ? 2 : A.n >= 3 ? 2 : 1, precTxt = ['', 'Baixa', 'Média', 'Alta'][prec];
   let st, head, sub;
-  if (beyond) { st = 'late'; head = `${over} dia${over > 1 ? 's' : ''} de atraso`; sub = A.max > A.hi ? `Habitual ${A.lo}–${A.hi} dias · você já teve ${A.max}` : `Seu padrão: ${A.lo}–${A.hi} dias`; }
+  if (beyond) { st = 'late'; head = `${over} dia${over > 1 ? 's' : ''} de atraso`; sub = A.pill?.stopped ? `Pílula interrompida em ${sd(A.pill.run.end)}: pode atrasar a ovulação` : A.max > A.hi ? `Habitual ${A.lo}–${A.hi} dias · você já teve ${A.max}` : `Seu padrão: ${A.lo}–${A.hi} dias`; }
   else if (ph === 'menstrual') { st = 'mens'; head = 'Menstruação'; sub = `Dia ${day}`; }
   else if (f && ['Alta', 'Muito alta'].includes(f.level)) { st = 'fert'; head = f.level === 'Muito alta' ? 'Pico de fertilidade' : 'Janela fértil'; sub = f.ov ? `Ovulação ${sd(f.ov)}` : `Chance ${f.level.toLowerCase()}`; }
   else { st = ph === 'lutea' ? 'lut' : 'fol'; head = PHASE[ph] || 'Ciclo'; sub = tdays > 0 ? `Menstruação em ~${tdays}d` : 'Menstruação hoje'; }
@@ -539,8 +562,9 @@ function vCal() {
     const L = S.logs[s] || {};
     const c = ['d', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
     const heart = L.sex && L.sex !== 'Não' ? '<b>♥</b>' : '';
-    const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex') ? '<i></i>' : '';
-    cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}<span class="mk">${heart}${dot}</span></button>`;
+    const pillM = (L.meds || []).includes('Anticoncepcional') ? '<u>💊</u>' : '', spotM = L.flow === 'spot' ? '<s></s>' : '';
+    const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex' && k !== 'meds') ? '<i></i>' : '';
+    cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}<span class="mk">${pillM}${spotM}${heart}${dot}</span></button>`;
   }
   let winCard = '';
   if (A.g.length) {
@@ -551,7 +575,7 @@ function vCal() {
   const title = new Date(cal.y, cal.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid">${cells}</div>
-  <div class="legend"><span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span></div>`;
+  <div class="legend"><span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span><span>💊 Pílula</span><span><i style="background:var(--rose);border-radius:50%;opacity:.7;width:7px;height:7px"></i>Escape</span></div>`;
 }
 
 function barChart(vals, a) {
@@ -1176,6 +1200,19 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) naviga
     S = norm(x); save(); render();
     notify('Histórico importado: ' + Object.keys(S.logs).length + ' dias de registro.');
   } catch { notify('Não consegui ler o link de importação.'); }
+})();
+
+// link de atualização: https://.../#merge=<dias novos em base64>. Junta aos dados que já estão no aparelho (campos do link prevalecem).
+(function mergeFromLink() {
+  const m = location.hash.match(/^#merge=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try {
+    const x = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!x.logs) throw 0;
+    let n = 0; for (const [d, f] of Object.entries(x.logs)) { S.logs[d] = { ...(S.logs[d] || {}), ...f }; n++; }
+    save(); render(); notify(n + ' dias atualizados no seu histórico.');
+  } catch { notify('Não consegui ler o link de atualização.'); }
 })();
 
 // se o app ficou aberto de um dia para o outro, recarrega para atualizar "hoje"
