@@ -401,9 +401,6 @@ function vHojeConceive(A, last) {
   }[st];
   const R = 44, C = 2 * Math.PI * R, pct = Math.min(day / Math.max(A.hi, day), 1);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
-  const tq = L.test === 'Positivo' ? 'pos' : L.test === 'Negativo' ? 'neg' : '';
-  const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não'], ['test', tq === 'pos' ? '➕' : tq === 'neg' ? '➖' : '🧾', tq === 'pos' ? 'Positivo' : tq === 'neg' ? 'Negativo' : 'Teste', !!tq]]
-    .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
   const ins = insights(A);
   INFO = {
     ...insightInfo(ins),
@@ -422,6 +419,7 @@ function vHojeConceive(A, last) {
     <div class="ht"><h2>${H[1]}</h2><p>${H[2]}</p></div></div>
     ${cycleStrip(A, last, F, f, day)}
   </section>
+  <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
   ${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="c_win"><small>Janela fértil</small><b>${win ? sr(win[0], win[1]) : '—'}</b><em>${src || 'sem estimativa'}</em></button>
@@ -431,8 +429,6 @@ function vHojeConceive(A, last) {
   </div>
   <button class="wide" data-act="info" data-k="c_tries"><span>Tentativas na janela</span><b>${tries}</b></button>
   <p class="tip">💡 ${H[3]}</p>
-  <h2 class="sec2">Registrar hoje</h2>
-  <div class="qrow q5">${quick}<button class="qk more" data-act="log" data-d="${TODAY}"><span>＋</span>Mais</button></div>
   ${pregBanner()}
   <p class="fine">Estimativas · confirme com teste de LH e orientação médica</p>`;
 }
@@ -515,8 +511,6 @@ function vHoje() {
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
   const ci = conceiveInfo(A), ovTile = f?.ev ? [sd(f.ov), f.level2] : ci.ov ? [sd(ci.ov), 'estimada pelos seus ciclos'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
-  const quick = [['muc', '💧', 'Muco', FERT_MUC.includes(L.mucus)], ['lh', '🧪', 'LH +', L.lh === 'Positivo'], ['pain', '⚡', 'Dor', (L.symptoms || []).includes('Dor na ovulação')], ['sex', '❤️', 'Relação', !!L.sex && L.sex !== 'Não']]
-    .map(([k, e, l, on]) => `<button class="qk ${on ? 'on' : ''}" data-act="q" data-k="${k}"><span>${e}</span>${l}</button>`).join('');
   const ins = insights(A);
   INFO = {
     h_mens: ['Previsão da menstruação', `<p>${F.nobase ? `Seu ciclo está no dia ${day}, mais longo que todos os que já registrei.` : F.extended ? `Seu ciclo passou da faixa habitual (${A.lo}–${A.hi} dias). Usei ${F.base} ciclo(s) anterior(es) que também passaram do dia ${day}: previsão <b>${sr(F.from, F.to)}</b>, mais provável <b>${sd(F.center)}</b>.` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
@@ -538,6 +532,7 @@ function vHoje() {
     <div class="ht"><h2>${head}</h2><p>${sub}</p></div></div>
     ${cycleStrip(A, last, F, f, day)}
   </section>
+  <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
   ${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${F.nobase ? 'Sem base' : sr(F.from, F.to)}</b><em>${F.nobase ? `dia ${day}, além do histórico` : F.extended ? `ciclos longos: ~${sd(F.center)}` : `provável ${sd(F.center)}`}</em></button>
@@ -545,8 +540,6 @@ function vHoje() {
     <button class="tile" data-act="info" data-k="h_chance"><small>Chance hoje</small><b style="color:${col}">${f ? f.level : '—'}</b><em>${f?.p != null ? Math.round(f.p * 100) + '% dos ciclos' : f?.ev ? 'ovulação ' + f.level2 : ''}</em></button>
     <button class="tile" data-act="info" data-k="h_mens"><small>Menstrua em 7 dias</small><b>${pr == null ? '—' : pr + '%'}</b><em>${pr == null ? 'fora do padrão' : 'de chance'}</em></button>
   </div>
-  <h2 class="sec2">Registrar hoje</h2>
-  <div class="qrow">${quick}<button class="qk more" data-act="log" data-d="${TODAY}"><span>＋</span>Mais</button></div>
   <p class="fine">Estimativas · não é método contraceptivo</p>`;
 }
 

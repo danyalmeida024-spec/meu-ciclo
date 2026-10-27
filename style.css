@@ -274,3 +274,14 @@ dialog.full[open]{display:flex;flex-direction:column}
 
 .mk u{text-decoration:none;font-size:8px;line-height:1}.mk s{text-decoration:none;display:block;width:5px;height:5px;border-radius:50%;background:var(--rose);opacity:.7}
 .d.today .mk s{background:#fff}
+
+/* ---- cartão menor e botão único de registro ---- */
+.hh{padding:12px 14px 10px;border-radius:22px;margin-bottom:10px;box-shadow:0 8px 20px -12px var(--gl,rgba(232,69,107,.5))}
+.hr{margin:16px 0 8px;gap:12px}
+.ring2{width:68px;height:68px}.ring2 b{font-size:25px}.ring2 small{font-size:9px}
+.ht h2{font-size:19px}.ht p{font-size:12.5px;margin-top:3px}
+.strip{gap:1.5px}.strip i{height:8px;border-radius:3px}.strip i.o,.strip i.n{transform:scaleY(1.4)}
+.lg{font-size:9.5px;margin-top:3px;gap:2px 10px}.lg i{width:8px;height:8px}
+.prec{top:8px;right:10px;padding:3px 8px;font-size:10px}.goalpill{top:8px;left:10px;padding:3px 8px;font-size:10px}
+.banner{padding:7px 12px;font-size:13px;margin-bottom:8px;border-radius:14px}
+.regbtn{margin:0 0 12px;padding:15px;font-size:17px;border-radius:18px;letter-spacing:.01em}
