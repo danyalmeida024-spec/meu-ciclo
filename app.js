@@ -552,7 +552,10 @@ function cpTile(m) {
   return `<button class="wide cp" data-act="info" data-k="cp"><span>Chance de ter engravidado neste ciclo<small>${m.rels.length} relação(ões) · varia de ${pc100(m.min)} a ${pc100(m.max)}${m.adjusted != null ? ` · com o teste negativo: ${pc100(m.adjusted)}` : ''}</small></span><b>${pc100(m.expected)}</b></button>`;
 }
 function insightsCard(list) {
-  return `<section class="insc"><header><h2>Identificado no seu ciclo</h2><small>toque para ver</small></header>${list.map(i => `<button class="ins ${i.lvl}" data-act="info" data-k="i_${i.id}"><span class="ic">${i.ic}</span><span class="tt"><b>${i.title}</b><small>${i.short}</small></span><span class="pl">${i.pill}</span></button>`).join('')}</section>`;
+  let open = false; try { open = localStorage.getItem('ciclo.ins') === '1'; } catch {}
+  const att = list.filter(i => i.lvl === 'warn' || i.lvl === 'alert').length;
+  const rows = list.map(i => `<button class="ins ${i.lvl}" data-act="info" data-k="i_${i.id}"><span class="ic">${i.ic}</span><span class="tt"><b>${i.title}</b><small>${i.short}</small></span><span class="pl">${i.pill}</span></button>`).join('');
+  return `<section class="insc ${open ? 'open' : ''}"><button class="insh" data-act="toggleins" aria-expanded="${open}"><span class="fi">📂</span><span class="ft"><b>Identificado no seu ciclo</b><small>${list.length} itens${att ? ` · ${att} pede${att > 1 ? 'm' : ''} atenção` : ' · tudo dentro do esperado'}</small></span><span class="dots">${list.map(i => `<i class="${i.lvl}"></i>`).join('')}</span><span class="chev">›</span></button><div class="insb"><div>${rows}</div></div></section>`;
 }
 
 function vHoje() {
@@ -1179,6 +1182,12 @@ document.addEventListener('click', e => {
       view = 'hoje'; save(); render(); scrollTo(0, 0); break;
     }
     case 'startgest': view = 'gest'; render(); scrollTo(0, 0); break;
+    case 'toggleins': {
+      const sec = t.closest('.insc'), o = !sec.classList.contains('open');
+      sec.classList.toggle('open', o); t.setAttribute('aria-expanded', o);
+      try { localStorage.setItem('ciclo.ins', o ? '1' : '0'); } catch {}
+      break;
+    }
     case 'close': $sheet.close(); break;
     case 'prev': cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); break;
     case 'next': cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); break;

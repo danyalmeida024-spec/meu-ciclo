@@ -290,3 +290,18 @@ dialog.full[open]{display:flex;flex-direction:column}
 .wide.cp>span{display:flex;flex-direction:column;gap:2px;color:var(--ink);font-size:14px;font-weight:800;min-width:0}
 .wide.cp small{font-size:11.5px;font-weight:600;color:var(--mute);line-height:1.3}
 .wide.cp b{font-size:30px;color:var(--pink);flex:none;margin-left:10px;letter-spacing:-.02em}
+
+/* ---- "Identificado no seu ciclo" como pasta ---- */
+.insc{padding:0;overflow:hidden}
+.insh{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:none;padding:12px 14px;transition:background .12s}
+.insh:active{background:var(--pink-l)}
+.insh .fi{font-size:24px;line-height:1}
+.insh .ft{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.insh .ft b{font-size:15px}.insh .ft small{font-size:12px;color:var(--mute)}
+.insh .dots{display:flex;gap:4px;flex:none}.insh .dots i{width:9px;height:9px;border-radius:50%;background:var(--lc,#999)}
+.insh .dots i.ok{--lc:#2fa37a}.insh .dots i.info{--lc:#4c6ef5}.insh .dots i.warn{--lc:#e39b2d}.insh .dots i.alert{--lc:#e8456b}
+.insh .chev{font-size:24px;color:var(--mute);transition:transform .25s;line-height:1}
+.insc.open .chev{transform:rotate(90deg)}
+.insb{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s ease}
+.insb>div{overflow:hidden;min-height:0;padding:0 8px}
+.insc.open .insb{grid-template-rows:1fr}.insc.open .insb>div{padding-bottom:6px;border-top:1px solid var(--line)}
+@media(prefers-reduced-motion:reduce){.insb,.insh .chev{transition:none}}
