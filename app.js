@@ -401,8 +401,9 @@ function vHojeConceive(A, last) {
   }[st];
   const R = 44, C = 2 * Math.PI * R, pct = Math.min(day / Math.max(A.hi, day), 1);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
-  const ins = insights(A);
+  const ins = insights(A), cm = conceptionModel(A);
   INFO = {
+    ...(cm ? { cp: cpInfo(cm) } : {}),
     ...insightInfo(ins),
     c_win: ['Janela fértil', `<p>${win ? `Janela: <b>${sr(win[0], win[1])}</b> (${src}). Melhores dias: <b>${sr(best[0], best[1])}</b>.` : 'Ainda não consigo estimar a janela.'}</p><p>Os 5 dias antes da ovulação e o dia dela são férteis; os 2 dias antes e o dia da ovulação são os melhores. Com teste de LH e muco registrados, a janela fica certeira.</p>`],
     c_chance: ['Chance hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p>`],
@@ -420,7 +421,7 @@ function vHojeConceive(A, last) {
     ${cycleStrip(A, last, F, f, day)}
   </section>
   <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
-  ${insightsCard(ins)}
+  ${cpTile(cm)}${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="c_win"><small>Janela fértil</small><b>${win ? sr(win[0], win[1]) : '—'}</b><em>${src || 'sem estimativa'}</em></button>
     <button class="tile" data-act="info" data-k="c_win"><small>Melhores dias</small><b>${best ? sr(best[0], best[1]) : '—'}</b><em>${ov ? 'ovulação ' + sd(ov) : ''}</em></button>
@@ -431,6 +432,57 @@ function vHojeConceive(A, last) {
   <p class="tip">💡 ${H[3]}</p>
   ${pregBanner()}
   <p class="fine">Estimativas · confirme com teste de LH e orientação médica</p>`;
+}
+
+// ---------- chance de ter engravidado neste ciclo ----------
+// Probabilidade de gravidez por relação, segundo a distância até a ovulação (Wilcox et al., NEJM 1995, casais saudáveis).
+const WIL = { '-5': .10, '-4': .16, '-3': .14, '-2': .27, '-1': .31, '0': .33, '1': .03 };
+const chanceIf = (rels, o) => 1 - rels.reduce((q, d) => q * (1 - (WIL[String(diff(d, o))] || 0)), 1);
+// sensibilidade do teste de urina conforme os dias desde a concepção
+const testSens = d => d < 8 ? 0 : d < 10 ? .2 : d < 12 ? .5 : d < 14 ? .75 : d < 16 ? .9 : d < 21 ? .97 : .99;
+function conceptionModel(A) {
+  const last = A.g.at(-1);
+  if (!last || S.settings.pregnancy) return null;
+  const rels = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
+  if (!rels.length) return null;
+  const e = ovEst(last.start, TODAY), cands = [];
+  for (let d = add(last.start, 7); d <= add(TODAY, 3); d = add(d, 1)) cands.push(d);
+  const prior = new Map(cands.map(d => [d, 0]));
+  const spread = (c, w, rad) => { for (let k = -rad; k <= rad; k++) { const d = add(c, k); if (prior.has(d)) prior.set(d, prior.get(d) + w * (rad + 1 - Math.abs(k)) / ((rad + 1) ** 2)); } };
+  if (e) spread(e.date, 1, e.level === 'confirmada' ? 1 : 3);
+  else {
+    const tw = A.ovSamples.reduce((t, x) => t + x[1], 0);
+    for (const [od, w] of A.ovSamples) spread(add(last.start, od - 1), .5 * w / tw, 3);
+    for (const d of cands) prior.set(d, prior.get(d) + .5 / cands.length);
+  }
+  const tot = [...prior.values()].reduce((a, b) => a + b, 0) || 1;
+  const byO = cands.map(o => ({ o, chance: chanceIf(rels, o), prior: prior.get(o) / tot }));
+  const expected = byO.reduce((t, x) => t + x.prior * x.chance, 0);
+  const negs = Object.keys(S.logs).filter(d => d >= last.start && S.logs[d].test === 'Negativo').sort(), lastNeg = negs.at(-1) || null;
+  let adjusted = null;
+  if (lastNeg) {
+    let num = 0, den = 0;
+    for (const x of byO) { const miss = 1 - testSens(diff(lastNeg, x.o)); num += x.prior * x.chance * miss; den += x.prior * (x.chance * miss + (1 - x.chance)); }
+    adjusted = den ? num / den : null;
+  }
+  const perRel = rels.map(d => ({ d, day: diff(d, last.start) + 1, chance: byO.reduce((t, x) => t + x.prior * (WIL[String(diff(d, x.o))] || 0), 0) }));
+  return { rels, byO, expected, min: Math.min(...byO.map(x => x.chance)), max: Math.max(...byO.map(x => x.chance)), lastNeg, adjusted, perRel, evidence: !!e, from: cands[0], to: cands.at(-1) };
+}
+const pc100 = x => x < .005 ? '<1%' : Math.round(x * 100) + '%';
+function cpChart(m) {
+  const W = 320, H = 110, pl = 28, pr = 6, pt = 8, pb = 22, n = m.byO.length, top = Math.max(.1, Math.ceil(m.max * 10) / 10);
+  const X = i => pl + i / Math.max(n - 1, 1) * (W - pl - pr), Y = v => pt + (1 - v / top) * (H - pt - pb);
+  const pts = m.byO.map((x, i) => `${X(i).toFixed(1)},${Y(x.chance).toFixed(1)}`);
+  const lab = (i, a) => `<text x="${X(i)}" y="${H - 6}" text-anchor="${a}">${sd(m.byO[i].o)}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}"><line x1="${pl}" x2="${W - pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><polygon points="${X(0)},${Y(0)} ${pts.join(' ')} ${X(n - 1)},${Y(0)}" fill="var(--pink)" fill-opacity=".18"/><polyline fill="none" stroke="var(--pink)" stroke-width="2" points="${pts.join(' ')}"/><text x="2" y="${Y(top) + 4}">${Math.round(top * 100)}%</text><text x="2" y="${Y(0) + 4}">0%</text>${lab(0, 'start')}${lab(Math.floor(n / 2), 'middle')}${lab(n - 1, 'end')}</svg>`;
+}
+function cpInfo(m) {
+  return ['Chance de ter engravidado neste ciclo', `<p style="margin:0"><span class="big" style="font-size:34px">${pc100(m.expected)}</span> <span class="mute">estimativa</span></p>
+  <p>Calculada pelas <b>${m.rels.length} relação(ões) sem proteção</b> deste ciclo e pelos dias em que ocorreram. Como a sua ovulação ${m.evidence ? 'tem sinais registrados, ela entrou na conta' : 'não tem sinais registrados, o app considerou todas as datas possíveis'}.</p>
+  <p>O resultado depende de quando você ovulou: varia de <b>${pc100(m.min)}</b> a <b>${pc100(m.max)}</b>. O gráfico mostra a chance em cada data possível de ovulação:</p>${cpChart(m)}
+  ${m.adjusted != null ? `<p>Considerando o <b>teste negativo de ${fmt(m.lastNeg)}</b>: <b>${pc100(m.adjusted)}</b>. Testes feitos poucos dias depois da concepção costumam errar.</p>` : ''}
+  <p class="small mute" style="margin:6px 0 4px">Chance por relação (na estimativa média):</p>${m.perRel.map(x => `<div class="row" style="padding:5px 0"><span>${fmt(x.d, { day: 'numeric', month: 'short' })} <span class="mute small">· dia ${x.day}</span></span><b>${pc100(x.chance)}</b></div>`).join('')}
+  <p class="note">O atraso da menstruação também aumenta a possibilidade, mas não entrou nesse cálculo. Valores baseados em médias de casais saudáveis (Wilcox, NEJM 1995): é uma estimativa, não um diagnóstico. Só o teste de gravidez confirma.</p>`];
 }
 
 // ---------- o que o app identificou no ciclo ----------
@@ -490,6 +542,10 @@ function insights(A) {
   return out;
 }
 const insightInfo = list => Object.fromEntries(list.map(i => ['i_' + i.id, [i.title, i.text + '<p class="note">Observações automáticas a partir dos seus registros, não são diagnóstico.</p>']]));
+function cpTile(m) {
+  if (!m) return '';
+  return `<button class="wide cp" data-act="info" data-k="cp"><span>Chance de ter engravidado neste ciclo<small>${m.rels.length} relação(ões) · varia de ${pc100(m.min)} a ${pc100(m.max)}${m.adjusted != null ? ` · com o teste negativo: ${pc100(m.adjusted)}` : ''}</small></span><b>${pc100(m.expected)}</b></button>`;
+}
 function insightsCard(list) {
   return `<section class="insc"><header><h2>Identificado no seu ciclo</h2><small>toque para ver</small></header>${list.map(i => `<button class="ins ${i.lvl}" data-act="info" data-k="i_${i.id}"><span class="ic">${i.ic}</span><span class="tt"><b>${i.title}</b><small>${i.short}</small></span><span class="pl">${i.pill}</span></button>`).join('')}</section>`;
 }
@@ -511,8 +567,9 @@ function vHoje() {
   const lhDay = Math.max(5, (A.n ? A.min : A.lo) - 17), lhDate = add(last.start, lhDay - 1);
   const col = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
   const ci = conceiveInfo(A), ovTile = f?.ev ? [sd(f.ov), f.level2] : ci.ov ? [sd(ci.ov), 'estimada pelos seus ciclos'] : ['—', diff(lhDate, TODAY) > 0 ? `LH em ${sd(lhDate)}` : 'faça o teste de LH'];
-  const ins = insights(A);
+  const ins = insights(A), cm = conceptionModel(A);
   INFO = {
+    ...(cm ? { cp: cpInfo(cm) } : {}),
     h_mens: ['Previsão da menstruação', `<p>${F.nobase ? `Seu ciclo está no dia ${day}, mais longo que todos os que já registrei.` : F.extended ? `Seu ciclo passou da faixa habitual (${A.lo}–${A.hi} dias). Usei ${F.base} ciclo(s) anterior(es) que também passaram do dia ${day}: previsão <b>${sr(F.from, F.to)}</b>, mais provável <b>${sd(F.center)}</b>.` : `Faixa provável: <b>${sr(F.from, F.to)}</b>. Mais provável: <b>${sd(F.center)}</b>.`}</p><p>${F.level ? `Baseada na ovulação ${F.level} (${F.src}) + sua fase lútea de ${A.luteal} dias.` : `Baseada nos seus ${A.n} últimos ciclos (${A.lo}–${A.hi} dias). Com teste de LH ou temperatura, a faixa fica bem mais estreita.`}</p>`],
     h_ov: ['Ovulação', f?.ev ? `<p>Ovulação <b>${f.level2}</b> em <b>${fmt(f.ov)}</b>, pelos sinais: ${ovSrc(last.start, TODAY)}.</p><p>Janela fértil: ${sr(add(f.ov, -5), add(f.ov, 1))}. Melhores dias: ${sr(add(f.ov, -2), f.ov)}.</p>` : `<p>Ainda sem sinais neste ciclo.</p><p>Registre o <b>muco</b> todo dia, a <b>dor</b> e o <b>teste de LH</b> (comece ${diff(lhDate, TODAY) > 0 ? 'em ' + fmt(lhDate) : 'hoje'}). Cada sinal ajusta a previsão.</p>`],
     h_chance: ['Chance de gravidez hoje', `<p><b>${f?.level || '—'}</b> — ${f?.txt || ''}.</p><p class="mute small">Estimativa: não serve como método contraceptivo.</p>`],
@@ -533,7 +590,7 @@ function vHoje() {
     ${cycleStrip(A, last, F, f, day)}
   </section>
   <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
-  ${insightsCard(ins)}
+  ${cpTile(cm)}${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="h_mens"><small>Próxima menstruação</small><b>${F.nobase ? 'Sem base' : sr(F.from, F.to)}</b><em>${F.nobase ? `dia ${day}, além do histórico` : F.extended ? `ciclos longos: ~${sd(F.center)}` : `provável ${sd(F.center)}`}</em></button>
     <button class="tile" data-act="info" data-k="h_ov"><small>Ovulação</small><b>${ovTile[0]}</b><em>${ovTile[1]}</em></button>

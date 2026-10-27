@@ -285,3 +285,8 @@ dialog.full[open]{display:flex;flex-direction:column}
 .prec{top:8px;right:10px;padding:3px 8px;font-size:10px}.goalpill{top:8px;left:10px;padding:3px 8px;font-size:10px}
 .banner{padding:7px 12px;font-size:13px;margin-bottom:8px;border-radius:14px}
 .regbtn{margin:0 0 12px;padding:15px;font-size:17px;border-radius:18px;letter-spacing:.01em}
+
+.wide.cp{align-items:center;text-align:left;margin-bottom:10px;border-color:var(--pink);background:linear-gradient(135deg,var(--card),var(--pink-l))}
+.wide.cp>span{display:flex;flex-direction:column;gap:2px;color:var(--ink);font-size:14px;font-weight:800;min-width:0}
+.wide.cp small{font-size:11.5px;font-weight:600;color:var(--mute);line-height:1.3}
+.wide.cp b{font-size:30px;color:var(--pink);flex:none;margin-left:10px;letter-spacing:-.02em}
