@@ -504,8 +504,10 @@ function insights(A) {
     else if ((pr != null && pr >= .5) || (!pc.hasNeg && over >= 7)) g = { lvl: 'alert', pill: 'Alta', short: pr != null ? `${pc100(pr)} pelas relações · ${over}d de atraso` : `${over} dias de atraso + relação sem proteção`, text: `${nums}${ovTxt}${testNow}` };
     else g = { lvl: 'warn', pill: 'Possível', short: pr != null ? `${pc100(pr)} pelas relações${cm.adjusted != null ? ' (com o teste negativo)' : ''} · ${over}d de atraso` : 'O teste negativo não cobre todas as relações', text: `${nums}${ovTxt}${pc.hasNeg ? `<p>Teste negativo em ${sd(pc.lastNeg)}. ${pc.line}</p>` : ''}${testNow}<p>Atrasos em ciclos irregulares também podem ter outras causas.</p>` };
   } else {
-    const c = conceiveInfo(A), hit = c.win && exp.some(d => d >= c.win[0] && d <= c.win[1]);
-    g = hit ? { lvl: 'info', pill: 'Possível', short: `Relação na janela fértil · teste a partir de ${sd(c.testDate)}`, text: `<p>Houve relação sem proteção dentro da janela fértil estimada (${sr(c.win[0], c.win[1])}). Faça o teste de gravidez a partir de <b>${fmt(c.testDate)}</b>.</p>` }
+    const c = conceiveInfo(A), hit = c.win && exp.some(d => d >= c.win[0] && d <= c.win[1]), cm = conceptionModel(A), pr = cm ? (cm.adjusted ?? cm.expected) : null;
+    const when = c.F.level ? `Ovulação ${c.F.level} em ${sd(c.F.ov)}: menstruação esperada entre ${sd(c.F.from)} e ${sd(c.F.to)}.` : '';
+    if (cm && pr >= .05) g = { lvl: pr >= .25 ? 'warn' : 'info', pill: 'Possível', short: `${pc100(pr)} pelas relações · teste a partir de ${sd(c.testDate)}`, text: `<p>Pelas relações e dias: <b>${pc100(cm.expected)}</b>${cm.adjusted != null ? `; considerando o teste negativo de ${sd(cm.lastNeg)}: <b>${pc100(cm.adjusted)}</b>` : ''}. Toque em "Chance de ter engravidado" para ver o detalhe.</p><p>${when}</p><p>Faça o teste de gravidez a partir de <b>${fmt(c.testDate)}</b> (primeira urina do dia). Um teste feito hoje cobre as relações até ${sd(add(TODAY, -14))}.</p>` };
+    else g = hit ? { lvl: 'info', pill: 'Possível', short: `Relação na janela fértil · teste a partir de ${sd(c.testDate)}`, text: `<p>Houve relação sem proteção dentro da janela fértil estimada (${sr(c.win[0], c.win[1])}). Faça o teste de gravidez a partir de <b>${fmt(c.testDate)}</b>.</p>` }
       : { lvl: 'ok', pill: 'Baixa', short: 'Relações fora da janela fértil estimada', text: '<p>As relações sem proteção registradas ficaram fora da janela fértil estimada. A estimativa pode errar em ciclos irregulares.</p>' };
   }
   out.push({ id: 'preg', ic: '🤰', title: 'Gravidez', ...g });
