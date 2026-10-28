@@ -305,3 +305,11 @@ dialog.full[open]{display:flex;flex-direction:column}
 .insb>div{overflow:hidden;min-height:0;padding:0 8px}
 .insc.open .insb{grid-template-rows:1fr}.insc.open .insb>div{padding-bottom:6px;border-top:1px solid var(--line)}
 @media(prefers-reduced-motion:reduce){.insb,.insh .chev{transition:none}}
+
+/* ---- cartão da fase clicável e explicação ---- */
+.hhb{cursor:pointer;border-radius:16px;outline:none}.hhb:focus-visible{box-shadow:0 0 0 3px #ffffff99}
+.phint{margin:5px 0 0 !important;font-size:11px !important;opacity:.85;font-weight:700;letter-spacing:.02em}
+h4.ph{margin:16px 0 6px;font-size:12px;color:var(--pink);text-transform:uppercase;letter-spacing:.06em}
+.feel{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.feel>div{display:flex;align-items:center;gap:10px;font-size:14px;padding:6px 10px;border-radius:12px;background:var(--pink-l)}
+.feel>div span{font-size:18px;width:24px;text-align:center;flex:none}

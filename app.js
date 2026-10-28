@@ -416,9 +416,9 @@ function vHojeConceive(A, last) {
   ${modeSwitch()}
   <section class="hh st-${H[0]}">
     <div class="goalpill">🌱 Modo engravidar${since ? ` · ciclo ${since}` : ''}</div>
-    <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
-    <div class="ht"><h2>${H[1]}</h2><p>${H[2]}</p></div></div>
-    ${cycleStrip(A, last, F, f, day)}
+    <div class="hhb" role="button" tabindex="0" data-act="phase" data-k="${H[0]}" aria-label="Entender esta fase"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
+    <div class="ht"><h2>${H[1]}</h2><p>${H[2]}</p><p class="phint">Toque para entender esta fase ›</p></div></div>
+    ${cycleStrip(A, last, F, f, day)}</div>
   </section>
   <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
   ${cpTile(cm)}${insightsCard(ins)}
@@ -558,6 +558,49 @@ function insightsCard(list) {
   return `<section class="insc ${open ? 'open' : ''}"><button class="insh" data-act="toggleins" aria-expanded="${open}"><span class="fi">📂</span><span class="ft"><b>Identificado no seu ciclo</b><small>${list.length} itens${att ? ` · ${att} pede${att > 1 ? 'm' : ''} atenção` : ' · tudo dentro do esperado'}</small></span><span class="dots">${list.map(i => `<i class="${i.lvl}"></i>`).join('')}</span><span class="chev">›</span></button><div class="insb"><div>${rows}</div></div></section>`;
 }
 
+// ---------- explicação da fase do ciclo (toque no cartão colorido) ----------
+const PHASES = {
+  lut: { t: 'Fase lútea', e: '🟠', what: 'É a fase entre a <b>ovulação</b> e a <b>próxima menstruação</b>. Depois que o óvulo é liberado, o folículo vira o <i>corpo lúteo</i>, que produz <b>progesterona</b> para preparar o útero. Dura em média <b>12 a 14 dias</b> (de 10 a 16 é normal). Sem gravidez, o corpo lúteo regride, os hormônios caem e a menstruação vem. Com gravidez, a progesterona continua alta e a menstruação não vem.',
+    feel: [['🎈', 'Inchaço e retenção de líquido'], ['💗', 'Seios sensíveis ou doloridos'], ['😴', 'Mais cansaço e mais sono'], ['🍫', 'Desejo de doces e mais apetite'], ['🎭', 'Irritação, ansiedade ou humor sensível (TPM)'], ['🔴', 'Acne e pele mais oleosa'], ['🧱', 'Intestino mais preso'], ['🤕', 'Dor de cabeça'], ['⚡', 'Cólicas leves perto da menstruação'], ['🌡️', 'Temperatura basal 0,2 a 0,5 °C mais alta'], ['💧', 'Secreção pegajosa, cremosa ou pouca: é o esperado']],
+    tips: ['Beba bastante água e reduza o sal para diminuir o inchaço', 'Durma bem e faça atividade leve', 'Anote os sintomas: eles ajudam a prever a próxima menstruação'], seek: 'dor forte, sangramento intenso ou TPM que atrapalha o dia a dia' },
+  fol: { t: 'Fase folicular', e: '🟣', what: 'Começa no <b>1º dia da menstruação</b> e vai até a <b>ovulação</b>. O cérebro manda o hormônio FSH, os folículos (onde ficam os óvulos) crescem e o <b>estrogênio</b> sobe, reconstruindo o revestimento do útero. É a fase que <b>mais varia</b> de duração, principalmente em ciclos irregulares.',
+    feel: [['⚡', 'Mais energia e disposição'], ['🙂', 'Humor mais estável e leve'], ['✨', 'Pele melhor'], ['🔥', 'Libido subindo aos poucos'], ['💧', 'A secreção muda: seca, depois pegajosa, cremosa e por fim aquosa ou clara de ovo'], ['🌡️', 'Temperatura basal mais baixa']],
+    tips: ['Boa fase para treinos mais intensos', 'Observe o muco: ele avisa que a ovulação está chegando'], seek: 'sangramento fora da menstruação ou dor pélvica forte' },
+  fert: { t: 'Janela fértil', e: '🟢', what: 'São os cerca de <b>6 dias que terminam na ovulação</b>, quando uma relação pode gerar gravidez. O estrogênio chega ao pico, o hormônio <b>LH</b> dispara e o óvulo é liberado cerca de 24 a 36 horas depois. Ele vive só ~24 horas, mas o espermatozoide sobrevive até 5 dias.',
+    feel: [['🥚', 'Muco elástico, transparente, como clara de ovo, ou aquoso'], ['🔥', 'Libido mais alta'], ['📍', 'Dor leve de um lado da barriga (dor da ovulação)'], ['🩸', 'Pequeno escape de sangue, em algumas mulheres'], ['💗', 'Seios sensíveis'], ['🌡️', 'A temperatura cai um pouco e sobe depois da ovulação']],
+    tips: ['Os 2 dias antes da ovulação e o dia dela são os de maior chance', 'O teste de LH positivo indica ovulação em 1 a 2 dias'], seek: 'dor forte ou que não passa' },
+  mens: { t: 'Menstruação', e: '🔴', what: 'É o <b>início do ciclo</b>. Sem gravidez, o estrogênio e a progesterona estão baixos e o útero elimina o revestimento que construiu. Dura em média 3 a 7 dias.',
+    feel: [['⚡', 'Cólicas'], ['🔙', 'Dor nas costas'], ['😴', 'Cansaço'], ['🎈', 'Inchaço'], ['🥺', 'Humor mais sensível'], ['🤕', 'Dor de cabeça (enxaqueca menstrual)']],
+    tips: ['Calor local e descanso aliviam a cólica', 'Ferro e boa hidratação ajudam a repor o que se perde'], seek: 'trocar o absorvente a cada hora por 2 horas seguidas, sangramento acima de 8 dias ou dor muito forte' },
+  late: { t: 'Ciclo além do habitual', e: '🔴', what: 'A menstruação ainda não veio e o ciclo <b>passou da sua faixa habitual</b>. As causas mais comuns são <b>gravidez</b>, ovulação tardia, estresse, mudança de peso ou de rotina, parar a pílula, tireoide e SOP.',
+    feel: [['💗', 'Seios sensíveis e cansaço (também ocorrem na gravidez)'], ['🤢', 'Enjoo, principalmente de manhã'], ['🚽', 'Vontade de urinar com mais frequência'], ['🎈', 'Inchaço e sensação de barriga pesada'], ['🩸', 'Escape leve, às vezes']],
+    tips: ['Faça um teste de gravidez com a primeira urina do dia', 'Sem menstruar por 3 meses, procure o ginecologista'], seek: 'dor forte, sangramento intenso, tontura ou desmaio' }
+};
+function recentMucus() {
+  const names = { Seco: 'sem secreção', Pegajoso: 'pegajosa', Cremoso: 'cremosa', 'Clara de ovo': 'clara de ovo', Aquoso: 'aquosa' }, runs = [];
+  for (let i = 9; i >= 0; i--) { const d = add(TODAY, -i), v = S.logs[d]?.mucus; if (!v) continue; const r = runs.at(-1); if (r && r.v === v && diff(d, r.end) === 1) r.end = d; else runs.push({ v, start: d, end: d }); }
+  return runs.map(r => `${names[r.v]} (${sr(r.start, r.end)})`);
+}
+function phaseSheet(A, kind) {
+  const P = PHASES[kind] || PHASES.fol, c = conceiveInfo(A), F = c.F, day = c.day, last = c.last;
+  let when = '';
+  if (kind === 'lut') {
+    if (c.ov) { const n = diff(TODAY, c.ov); when = `<p>Ovulação ${c.e ? c.e.level : 'estimada'} em <b>${fmt(c.ov)}</b>${c.e ? ` (${c.e.src.join(' + ')})` : ''}. Hoje é o <b>${n}º dia depois da ovulação</b>, no <b>dia ${day}</b> do seu ciclo.</p><p>Menstruação esperada entre <b>${sd(F.from)}</b> e <b>${sd(F.to)}</b>.${n > 16 ? ` Isso já passa da duração habitual da fase lútea (12 a 14 dias; a sua medida: ${A.luteal}), então a menstruação deve vir logo, <b>ou pode ser gravidez</b>: um teste mostra.` : ''}</p>`; }
+    else when = `<p>Você está no <b>dia ${day}</b> do ciclo. Sem sinais de ovulação registrados, o app estimou a fase pelos seus ciclos. Menstruação esperada entre <b>${sd(F.from)}</b> e <b>${sd(F.to)}</b>.</p>`;
+  } else if (kind === 'fol') when = `<p>Você está no <b>dia ${day}</b> do ciclo.${c.ov ? ` Ovulação estimada em <b>${fmt(c.ov)}</b>.` : ''}</p>`;
+  else if (kind === 'fert') when = `<p>Você está no <b>dia ${day}</b> do ciclo.${c.win ? ` Janela fértil: <b>${sr(c.win[0], c.win[1])}</b>; melhores dias: <b>${sr(c.best[0], c.best[1])}</b>.` : ''}</p>`;
+  else if (kind === 'mens') when = `<p>Você está no <b>dia ${day}</b> do ciclo, o <b>${diff(TODAY, last.start) + 1}º dia</b> da menstruação.</p>`;
+  else when = `<p>Você está no <b>dia ${day}</b> do ciclo, <b>${F.over} dia(s)</b> além da faixa habitual (${A.lo}–${A.hi} dias).${A.max > A.hi ? ` Você já teve ciclos de até ${A.max} dias.` : ''}${A.pill?.stopped ? ' A pílula interrompida pode atrasar a ovulação.' : ''}</p>`;
+  const rec = recentMucus(), mine = (S.logs[TODAY]?.symptoms || []);
+  const overlap = kind === 'lut' ? '<p><b>Atenção:</b> vários desses sinais (seios sensíveis, cansaço, enjoo, vontade de urinar, pequeno escape 6 a 12 dias após a ovulação) são <b>iguais aos do início da gravidez</b>. Só o teste de gravidez diferencia.</p>' : '';
+  return [`${P.e} ${P.t}`, `<p>${P.what}</p>
+    <h4 class="ph">Em que período você está</h4>${when}
+    <h4 class="ph">O que costuma sentir</h4><div class="feel">${P.feel.map(([e, t]) => `<div><span>${e}</span>${t}</div>`).join('')}</div>${overlap}
+    ${rec.length ? `<h4 class="ph">O que você registrou</h4><p>Secreção: ${rec.join(', ')}.${kind === 'lut' ? ' Secreção pegajosa ou cremosa é a esperada nesta fase.' : ''}</p>` : ''}
+    <h4 class="ph">Cuidados</h4><p>${P.tips.map(x => '• ' + x).join('<br>')}</p>
+    <p class="note">Procure atendimento se tiver ${P.seek}. Informação geral, não substitui orientação médica.</p>`];
+}
+
 function vHoje() {
   const A = analyze(), last = A.g.at(-1);
   if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Registre o <b>primeiro dia da última menstruação</b> (ou importe seu histórico em Ajustes).</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
@@ -593,9 +636,9 @@ function vHoje() {
   ${modeSwitch()}${pregBanner()}${pos}${banner}
   <section class="hh st-${st}">
     <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
-    <div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
-    <div class="ht"><h2>${head}</h2><p>${sub}</p></div></div>
-    ${cycleStrip(A, last, F, f, day)}
+    <div class="hhb" role="button" tabindex="0" data-act="phase" data-k="${st}" aria-label="Entender esta fase"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
+    <div class="ht"><h2>${head}</h2><p>${sub}</p><p class="phint">Toque para entender esta fase ›</p></div></div>
+    ${cycleStrip(A, last, F, f, day)}</div>
   </section>
   <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
   ${cpTile(cm)}${insightsCard(ins)}
@@ -1122,7 +1165,7 @@ function doImport(txt) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('button'); if (!t) return;
+  const t = e.target.closest('button, [data-act]'); if (!t) return;
   if (t.dataset.go) { view = t.dataset.go; gv = null; render(); scrollTo(0, 0); return; }
   if (t.dataset.tab) { view = t.dataset.tab; gv = null; render(); scrollTo(0, 0); return; }
   const chip = t.closest('.chip') && t;
@@ -1182,6 +1225,10 @@ document.addEventListener('click', e => {
       view = 'hoje'; save(); render(); scrollTo(0, 0); break;
     }
     case 'startgest': view = 'gest'; render(); scrollTo(0, 0); break;
+    case 'phase': {
+      const [title, html] = phaseSheet(analyze(), t.dataset.k);
+      $sheet.className = ''; $sheet.innerHTML = `<h1>${title}</h1>${html}<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>`; $sheet.showModal(); break;
+    }
     case 'toggleins': {
       const sec = t.closest('.insc'), o = !sec.classList.contains('open');
       sec.classList.toggle('open', o); t.setAttribute('aria-expanded', o);
@@ -1233,6 +1280,7 @@ document.addEventListener('input', e => {
   if (b3.querySelector('canvas')) { clearTimeout(t3); t3 = setTimeout(mount3d, 60); } else b3.innerHTML = fetusSvg(gv);
   document.getElementById('wk-cards').innerHTML = weekCards(gv);
 });
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute?.('role') === 'button') { e.preventDefault(); e.target.click(); } });
 $sheet.addEventListener('click', e => { if (e.target === $sheet && !$sheet.classList.contains('full')) $sheet.close(); });
 $sheet.addEventListener('close', () => { if ($sheet.classList.contains('full')) { $sheet.className = ''; DAY = null; render(); } });
 document.addEventListener('input', e => {
