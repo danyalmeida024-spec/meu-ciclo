@@ -1036,7 +1036,8 @@ function vHojePreg() {
     <button class="tile" data-go="gest"><small>Próximo exame</small><b style="font-size:14px">${ex ? ex[2].split(':')[0].replace(/ \(.*\)/, '') : 'Pré-natal'}</b><em>${ex ? `${ex[0]}–${ex[1]} semanas` : ''}</em></button>
     <button class="tile" data-act="info" data-k="conc"><small>Implantação</small><b>${sd(ci.imp)}</b><em>ovulação ~${sd(ci.ov)}</em></button>
   </div>
-  <p class="fine">Estimativas · confirme datas com ultrassom e seu obstetra</p>`;
+  <p class="fine">Estimativas · confirme datas com ultrassom e seu obstetra</p>
+  <button class="quiet" data-act="endpreg">Sair do modo gestação</button>`;
 }
 function pregBanner() {
   const g = pregInfo();
@@ -1340,7 +1341,7 @@ document.addEventListener('click', e => {
       if (!d) { notify('Informe a DUM ou a DPP.'); break; }
       S.settings.pregnancy = { dum: d }; S.settings.goal = 'track'; save(); render(); break;
     }
-    case 'endpreg': ask('Encerrar o acompanhamento da gestação?', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
+    case 'endpreg': ask('Sair do modo gestação? Seus registros continuam salvos e o app volta ao modo de ciclo.', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
     case 'info': {
       const [title, html] = INFO[t.dataset.k];
