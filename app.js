@@ -943,6 +943,8 @@ function vAna() {
   <button class="btn alt" data-go="guia">Guia de saúde baseado em diretrizes</button>`;
 }
 
+// código curto dos seus dados: se for igual nos dois aparelhos, o calendário também será
+const dataCode = () => { const t = JSON.stringify(Object.entries(S.logs).sort()); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) >>> 0; return h.toString(36).toUpperCase().slice(0, 5); };
 function vCfg() {
   const s = S.settings;
   return `<h1>Ajustes</h1>
@@ -959,7 +961,7 @@ function vCfg() {
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>
-  <p class="fine">Meu Ciclo · versão 39</p>`;
+  <p class="fine">Meu Ciclo · versão 40 · ${Object.keys(S.logs).length} dias registrados · código ${dataCode()}</p>`;
 }
 
 function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }
