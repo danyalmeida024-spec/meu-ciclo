@@ -13,6 +13,8 @@ const KEY = 'ciclo.v1';
 const DEF = { logs: {}, settings: { cycle: 28, period: 5, luteal: 14, pregnancy: null, checklist: {}, goal: 'track', conceiveSince: null } };
 const norm = x => {
   const o = { logs: x.logs || {}, settings: { ...DEF.settings, ...x.settings }, savedAt: x.savedAt || 0 };
+  // relações importadas sem detalhe ('Sim') são todas sem proteção
+  for (const l of Object.values(o.logs)) if (l.sex === 'Sim') l.sex = 'Sem proteção';
   // gestação sem data de início (versões antigas): o passado nunca é reclassificado
   if (o.settings.pregnancy && !o.settings.pregnancy.since) o.settings.pregnancy = { ...o.settings.pregnancy, since: new Date().toLocaleDateString('sv') };
   return o;
@@ -869,7 +871,7 @@ function vCfg() {
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>
-  <p class="fine">Meu Ciclo · versão 35</p>`;
+  <p class="fine">Meu Ciclo · versão 36</p>`;
 }
 
 function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }
