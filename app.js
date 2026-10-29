@@ -496,13 +496,7 @@ const WIL = { '-5': .10, '-4': .16, '-3': .14, '-2': .27, '-1': .31, '0': .33, '
 const chanceIf = (rels, o) => 1 - rels.reduce((q, d) => q * (1 - (WIL[String(diff(d, o))] || 0)), 1);
 // sensibilidade do teste de urina conforme os dias desde a concepção
 const testSens = d => d < 8 ? 0 : d < 10 ? .2 : d < 12 ? .5 : d < 14 ? .75 : d < 16 ? .9 : d < 21 ? .97 : .99;
-function conceptionModel(A) {
-  const last = A.g.at(-1);
-  if (!last || S.settings.pregnancy) return null;
-  const rels = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
-  if (!rels.length) return null;
-  const e = ovEst(last.start, TODAY), cands = [];
-  for (let d = add(last.start, 7); d <= add(TODAY, 3); d = add(d, 1)) cands.push(d);
+function ovPrior(A, last, e, cands) {
   const prior = new Map(cands.map(d => [d, 0]));
   const spread = (c, w, rad) => { for (let k = -rad; k <= rad; k++) { const d = add(c, k); if (prior.has(d)) prior.set(d, prior.get(d) + w * (rad + 1 - Math.abs(k)) / ((rad + 1) ** 2)); } };
   if (e) spread(e.date, 1, e.level === 'confirmada' ? 1 : 3);
@@ -511,6 +505,38 @@ function conceptionModel(A) {
     for (const [od, w] of A.ovSamples) spread(add(last.start, od - 1), .5 * w / tw, 3);
     for (const d of cands) prior.set(d, prior.get(d) + .5 / cands.length);
   }
+  return prior;
+}
+// Estima a data de ovulação/concepção SE houve gravidez, combinando sinais, relações e testes (negativos afastam concepções antigas).
+function estConception(A, until) {
+  const last = A.g.at(-1); if (!last) return null;
+  const rels = Object.keys(S.logs).filter(d => d >= last.start && d <= until && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
+  const tests = Object.keys(S.logs).filter(d => d >= last.start && d <= until && S.logs[d].test).map(d => [d, S.logs[d].test]);
+  const e = ovEst(last.start, until), cands = [];
+  for (let d = add(last.start, 7); d <= add(until, -7); d = add(d, 1)) cands.push(d);
+  if (!cands.length) return null;
+  const prior = ovPrior(A, last, e, cands);
+  const post = cands.map(o => {
+    let w = (prior.get(o) || 0) + 1e-6;
+    if (rels.length) w *= chanceIf(rels, o) + 1e-4;
+    for (const [d, r] of tests) { const sn = testSens(diff(d, o)); w *= r === 'Negativo' ? 1 - sn * .98 : sn + .01; }
+    return { o, w };
+  });
+  const tot = post.reduce((a, x) => a + x.w, 0) || 1; post.forEach(x => x.w /= tot);
+  const mode = post.slice().sort((a, b) => b.w - a.w)[0];
+  let acc = 0, lo = post[0].o, hi = post.at(-1).o;
+  for (const x of post) { acc += x.w; if (acc < .1) lo = x.o; if (acc <= .9) hi = x.o; }
+  const shares = rels.map(r => ({ d: r, share: post.reduce((t, x) => { const sum = rels.reduce((a, q) => a + (WIL[String(diff(q, x.o))] || 0), 0); return t + (sum ? x.w * (WIL[String(diff(r, x.o))] || 0) / sum : 0); }, 0) }));
+  return { ov: mode.o, lo, hi, shares, rels, evidence: !!e };
+}
+function conceptionModel(A) {
+  const last = A.g.at(-1);
+  if (!last || S.settings.pregnancy) return null;
+  const rels = Object.keys(S.logs).filter(d => d >= last.start && d <= TODAY && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
+  if (!rels.length) return null;
+  const e = ovEst(last.start, TODAY), cands = [];
+  for (let d = add(last.start, 7); d <= add(TODAY, 3); d = add(d, 1)) cands.push(d);
+  const prior = ovPrior(A, last, e, cands);
   const tot = [...prior.values()].reduce((a, b) => a + b, 0) || 1;
   const byO = cands.map(o => ({ o, chance: chanceIf(rels, o), prior: prior.get(o) / tot }));
   const expected = byO.reduce((t, x) => t + x.prior * x.chance, 0);
@@ -1002,11 +1028,12 @@ function pregInfo() {
   return { dum: p.dum, dias, sem, d: dias % 7, dpp, left: diff(dpp, TODAY), tri: sem < 14 ? '1º trimestre' : sem < 28 ? '2º trimestre' : '3º trimestre' };
 }
 function conceptionInfo(g) {
-  const ov = add(g.dum, 14), rels = Object.keys(S.logs).filter(d => d >= add(ov, -5) && d <= add(ov, 1) && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
-  const ps = rels.map(d => ({ d, p: WIL[String(diff(d, ov))] || 0 })), tot = ps.reduce((a, x) => a + x.p, 0) || 1;
-  ps.forEach(x => x.share = Math.round(x.p / tot * 100));
-  const best = ps.slice().sort((a, b) => b.p - a.p)[0] || null;
-  return { ov, ps, best, imp: add(ov, 7) };
+  const ov = add(g.dum, 14), est = S.settings.pregnancy.manual ? null : estConception(analyze(), TODAY);
+  const ps = est ? est.shares.filter(x => x.share >= .02).map(x => ({ d: x.d, share: Math.round(x.share * 100) })) : [];
+  if (!est) Object.keys(S.logs).filter(d => d >= add(ov, -5) && d <= add(ov, 1) && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort().forEach(d => ps.push({ d, share: 0, p: WIL[String(diff(d, ov))] || 0 }));
+  if (!est) { const tot = ps.reduce((a, x) => a + x.p, 0) || 1; ps.forEach(x => x.share = Math.round(x.p / tot * 100)); }
+  const best = ps.slice().sort((a, b) => b.share - a.share)[0] || null;
+  return { ov, ps, best, imp: add(ov, 7), est };
 }
 function vHojePreg() {
   const g = pregInfo(), A = analyze(), ci = conceptionInfo(g), wk = Math.min(Math.max(g.sem, 4), 40), tn = g.sem < 14 ? 1 : g.sem < 28 ? 2 : 3;
@@ -1130,9 +1157,9 @@ function weekCards(w) {
 }
 
 function vGest() {
-  const g = pregInfo(), last = analyze().g.at(-1);
+  const g = pregInfo(), A0 = analyze(), last = A0.g.at(-1), est = g ? null : estConception(A0, TODAY), sugg = est ? add(est.ov, -14) : last ? last.start : '';
   if (!g) return `<h1>Gestação 🤰</h1><div class="card"><p>Já está grávida? Informe uma das datas e eu acompanho semana a semana: tamanho do bebê, desenvolvimento, exames e contagem para o parto.</p>
-    <label class="f">Data da última menstruação (DUM)</label><input type="date" id="dum" value="${last ? last.start : ''}" max="${TODAY}">
+    <label class="f">Data da última menstruação (DUM)</label><input type="date" id="dum" value="${sugg}" max="${TODAY}">${est ? `<p class="note" style="margin:6px 0 0">Sugerida pelo app: concepção por volta de <b>${sd(est.ov)}</b> (entre ${sd(est.lo)} e ${sd(est.hi)}), considerando seus sinais de ovulação, relações e testes — não só a última menstruação. A DUM equivalente é ${fmt(sugg, { day: "numeric", month: "long" })}.</p>` : ''}
     <label class="f">…ou Data provável do parto (DPP)</label><input type="date" id="dpp">
     <div style="height:12px"></div><button class="btn" data-act="startpreg">Iniciar acompanhamento</button>
     <p class="note">Com ciclos irregulares a DUM pode errar por semanas: se você já fez ultrassom, prefira a DPP informada pelo médico.</p></div>`;
@@ -1285,10 +1312,10 @@ function saveTest(res) {
   if (kind === 'lh') { L.lh = res; L.lhAt = tm; } else { L.test = res; L.testAt = tm; }
   save();
   if (kind === 'preg' && res === 'Positivo' && !S.settings.pregnancy) {
-    const A = analyze(), last = A.g.at(-1), ov = last ? detectOv(last.start, d) : null;
+    const A = analyze(), last = A.g.at(-1), est = estConception(A, d), ov = est?.ov || null;
     const dum = ov ? add(ov, -14) : (last ? last.start : add(d, -28));
     S.settings.pregnancy = { dum }; S.settings.goal = 'track'; view = 'gest'; save(); render(); scrollTo(0, 0);
-    dialog(`<h2 style="margin:0 0 8px">Parabéns! 💜</h2><p>Teste positivo registrado em ${sd(d)} às ${tm}. Passei o app para o acompanhamento da gestação.</p><p class="mute small">Contei as semanas a partir de ${fmt(dum, { day: 'numeric', month: 'long' })} (${ov ? 'ovulação estimada − 14 dias' : 'início da última menstruação'}). Com ciclo irregular isso pode variar: confirme com beta-hCG e ultrassom, e ajuste a data na aba Gestação.</p>`);
+    dialog(`<h2 style="margin:0 0 8px">Parabéns! 💜</h2><p>Teste positivo registrado em ${sd(d)} às ${tm}. Passei o app para o acompanhamento da gestação.</p><p class="mute small">Contei as semanas a partir de ${fmt(dum, { day: 'numeric', month: 'long' })} (${ov ? `concepção estimada em ${sd(ov)}, pelos seus sinais, relações e testes` : 'início da última menstruação'}). Com ciclo irregular isso pode variar: confirme com beta-hCG e ultrassom, e ajuste a data na aba Gestação.</p>`);
     return;
   }
   render();
@@ -1339,7 +1366,7 @@ document.addEventListener('click', e => {
       const dpp = document.getElementById('dpp').value, dum = document.getElementById('dum').value;
       const d = dpp ? add(dpp, -280) : dum;
       if (!d) { notify('Informe a DUM ou a DPP.'); break; }
-      S.settings.pregnancy = { dum: d }; S.settings.goal = 'track'; save(); render(); break;
+      S.settings.pregnancy = { dum: d, manual: true }; S.settings.goal = 'track'; save(); render(); break;
     }
     case 'endpreg': ask('Sair do modo gestação? Seus registros continuam salvos e o app volta ao modo de ciclo.', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
@@ -1373,7 +1400,7 @@ document.addEventListener('click', e => {
       const g = pregInfo(); if (!g) break;
       dialog(`<h2 style="margin:0 0 8px">Ajustar data da gestação</h2><p class="mute small">Data de início usada para contar as semanas (equivale à DUM). Se tiver ultrassom, use a DPP do médico.</p><label class="f">DUM</label><input type="date" id="dum2" value="${g.dum}" max="${TODAY}"><div style="height:12px"></div><button class="btn" data-act="savedum">Salvar</button>`); break;
     }
-    case 'savedum': { const v = document.getElementById('dum2').value; if (v) { S.settings.pregnancy = { ...S.settings.pregnancy, dum: v }; save(); $sheet.close(); render(); } break; }
+    case 'savedum': { const v = document.getElementById('dum2').value; if (v) { S.settings.pregnancy = { ...S.settings.pregnancy, dum: v, manual: true }; save(); $sheet.close(); render(); } break; }
     case 'startgest': view = 'gest'; render(); scrollTo(0, 0); break;
     case 'phase': {
       const [title, html] = phaseSheet(analyze(), t.dataset.k);
