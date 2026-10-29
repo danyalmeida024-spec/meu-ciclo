@@ -266,7 +266,20 @@ function marks(A) {
       for (let i = 0; i <= A.hi + 2; i++) { const p = fertProb(A, i + 1, 0); if (p !== null && p >= .45) { const dd = add(c2, i); if (!fert.has(dd)) fert.set(dd, p * .7); } }
     }
   }
-  return { per, pper, pper2, fert, ov, late };
+  // ovulação prevista no cenário atual: distribuição do dia da ovulação a partir da próxima menstruação (ou de hoje, se atrasada)
+  const ovp = new Map();
+  if (last) {
+    const F2 = nextPeriod(A);
+    if (!F2.nobase) {
+      const st0 = F2.center > TODAY ? F2.center : add(TODAY, 1), pr = new Map(), spread = (c, w) => { for (let k = -2; k <= 2; k++) pr.set(add(c, k), (pr.get(add(c, k)) || 0) + w * (3 - Math.abs(k)) / 9); };
+      const tw = A.ovSamples.reduce((t, x) => t + x[1], 0) || 1;
+      for (const [od, w] of A.ovSamples) spread(add(st0, od - 1), w / tw);
+      const mx = Math.max(...pr.values()), tot = [...pr.values()].reduce((a, b) => a + b, 0); let acc = 0; ovp.range = [null, null];
+      for (const d of [...pr.keys()].sort()) { acc += pr.get(d) / tot; if (ovp.range[0] === null && acc >= .1) ovp.range[0] = d; if (ovp.range[1] === null && acc >= .9) ovp.range[1] = d; }
+      for (const [d, p] of pr) if (p >= mx * .4 && d >= TODAY) ovp.set(d, p / mx);
+    }
+  }
+  return { per, pper, pper2, fert, ov, late, ovp };
 }
 
 function phaseOf(date, A) {
@@ -737,9 +750,10 @@ function vHoje() {
   <p class="fine">Estimativas · não é método contraceptivo</p>`;
 }
 
+const F0late = A => nextPeriod(A).late;
 function vCal() {
   const A = analyze(), K = marks(A), pg = pregInfo(), since = pregSince(), ci = pg ? conceptionInfo(pg) : null;
-  if (pg) { for (const d of [...K.pper, ...K.pper2, ...K.late, ...K.ov]) if (d >= since) { K.pper.delete(d); K.pper2.delete(d); K.late.delete(d); K.ov.delete(d); } for (const d of [...K.fert.keys()]) if (d >= since) K.fert.delete(d); }
+  if (pg) { for (const d of [...K.pper, ...K.pper2, ...K.late, ...K.ov]) if (d >= since) { K.pper.delete(d); K.pper2.delete(d); K.late.delete(d); K.ov.delete(d); K.ovp.delete(d); } for (const d of [...K.ovp.keys()]) if (d >= since) K.ovp.delete(d); for (const d of [...K.fert.keys()]) if (d >= since) K.fert.delete(d); }
   const first = new Date(cal.y, cal.m, 1, 12), n = new Date(cal.y, cal.m + 1, 0).getDate();
   const best = new Set();
   if (goalOf() === 'conceive') K.ov.forEach(o => { for (let k = -2; k <= 0; k++) best.add(add(o, k)); });
@@ -749,12 +763,12 @@ function vCal() {
     const s = iso(new Date(cal.y, cal.m, d, 12));
     const L = S.logs[s] || {};
     const inPg = pg && s >= since && s <= add(pg.dpp, 14), pgd = inPg ? diff(s, pg.dum) : 0;
-    const c = ['d', inPg && !K.per.has(s) ? 'pg' + (s === pg.dpp ? ' dpp' : '') + (s === ci.ov ? ' conc' : '') : '', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
+    const c = ['d', inPg && !K.per.has(s) ? 'pg' + (s === pg.dpp ? ' dpp' : '') + (s === ci.ov ? ' conc' : '') : '', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : K.ovp.has(s) ? 'ovp' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
     const heart = L.sex && L.sex !== 'Não' ? '<b>♥</b>' : '';
     const pillM = (L.meds || []).includes('Anticoncepcional') ? '<u>💊</u>' : '', spotM = L.flow === 'spot' ? '<s></s>' : '';
     const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex' && k !== 'meds') ? '<i></i>' : '';
     const wkm = inPg && pgd >= 0 && pgd % 7 === 0 && s !== TODAY ? `<em class="wkm">${pgd / 7}s</em>` : '';
-    cells += `<button class="${c}" ${K.fert.has(s) ? `style="--p:${K.fert.get(s)}"` : ''} data-act="log" data-d="${s}">${d}${wkm}<span class="mk">${s === pg?.dpp ? '🎀' : ''}${pillM}${spotM}${heart}${dot}</span></button>`;
+    cells += `<button class="${c}" ${K.fert.has(s) || K.ovp.has(s) ? `style="--p:${K.fert.get(s) ?? 1};--q:${K.ovp.get(s) ?? 1}"` : ''} data-act="log" data-d="${s}">${d}${wkm}<span class="mk">${s === pg?.dpp ? '🎀' : ''}${pillM}${spotM}${heart}${dot}</span></button>`;
   }
   let winCard = '';
   if (pg) winCard = `<div class="predrow"><div class="pred p3"><small>Gestação</small><b>${pg.sem}s ${pg.d}d</b><em>${pg.tri}</em></div><div class="pred p3"><small>Parto previsto</small><b>${fmt(pg.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</b><em>faltam ${Math.max(pg.left, 0)} dias</em></div></div>`;
@@ -763,10 +777,15 @@ function vCal() {
     const win = c.win ? sr(c.win[0], c.win[1]) : '—', best = c.best ? sr(c.best[0], c.best[1]) : '';
     winCard = `<div class="predrow"><div class="pred p1"><small>Próxima menstruação</small><b>${F.nobase ? 'Sem base' : sr(F.from, F.to)}</b><em>${F.nobase ? 'além do histórico' : `provável ${sd(F.center)}`}</em></div><div class="pred p2"><small>Período fértil</small><b>${win}</b><em>${best ? `melhores dias ${best}` : 'sem estimativa'}</em></div></div><p class="note">Previsão com base nos seus ${A.n} ciclos (${A.min ?? '—'} a ${A.max ?? '—'} dias)${F.extended && !F.nobase ? ` · como o ciclo passou do habitual, usei seus ciclos longos` : ''}.</p>`;
   }
+  if (!pg && A.g.length) {
+    const past = [...K.ov].filter(d => d <= TODAY).sort(), lastOv = past.at(-1), pk = [...K.ovp.entries()].sort((a, b) => b[1] - a[1])[0], ks = [...K.ovp.keys()].sort();
+    const e = ovEst(A.g.at(-1).start, TODAY);
+    if (lastOv || pk) winCard += `<div class="list" style="margin-top:10px">${more('Ovulação', `${past.length ? `<p><b>Dias em que você provavelmente ovulou</b> (marcados em verde sólido no calendário):</p>${past.slice(-6).reverse().map(d => `<p style="margin:3px 0">• ${fmt(d, { weekday: 'short', day: 'numeric', month: 'long' })}${d === lastOv && e ? ` · ${e.level} (${ovSrc(A.g.at(-1).start, TODAY)})` : ''}</p>`).join('')}` : ''}${pk ? `<p style="margin-top:12px"><b>Previsão para o próximo ciclo</b></p><p>Mais provável por volta de <b>${fmt(pk[0], { day: 'numeric', month: 'long' })}</b>, na maioria dos cenários entre ${sd(K.ovp.range[0])} e ${sd(K.ovp.range[1])} (contornos pontilhados no calendário; os mais fortes são os mais prováveis).</p><p class="mute small">Calculada a partir do dia da ovulação dos seus ciclos anteriores, contando do início da próxima menstruação${F0late(A) ? ', que ainda não veio: se ela começar mais tarde, estas datas se deslocam junto' : ''}.</p>` : ''}<p class="note">Estimativas. O teste de LH e o muco fértil registrados no app refinam a previsão.</p>`, `${lastOv ? 'última ' + sd(lastOv) : ''}${lastOv && pk ? ' · ' : ''}${pk ? 'próxima ~' + sd(pk[0]) : ''}`, '🥚')}</div>`;
+  }
   const title = new Date(cal.y, cal.m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid">${cells}</div>
-  ${more('Legenda do calendário', `<div class="legend" style="margin:0">${pg ? `<span><i style="background:var(--pink-l);border:1px solid var(--pink)"></i>Gestação (a partir de ${sd(since)})</span><span>🎀 Parto previsto</span><span><i style="border:2px dotted var(--pink);border-radius:50%"></i>Concepção</span><span>Ns = semana</span>` : ''}<span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span><span>💊 Pílula</span><span><i style="background:var(--rose);border-radius:50%;opacity:.7;width:7px;height:7px"></i>Escape</span></div>`, '', '🎨')}`;
+  ${more('Legenda do calendário', `<div class="legend" style="margin:0">${pg ? `<span><i style="background:var(--pink-l);border:1px solid var(--pink)"></i>Gestação (a partir de ${sd(since)})</span><span>🎀 Parto previsto</span><span><i style="border:2px dotted var(--pink);border-radius:50%"></i>Concepção</span><span>Ns = semana</span>` : ''}<span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="background:var(--teal);border-radius:50%"></i>Ovulação provável</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação prevista</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span><span>💊 Pílula</span><span><i style="background:var(--rose);border-radius:50%;opacity:.7;width:7px;height:7px"></i>Escape</span></div>`, '', '🎨')}`;
 }
 
 function barChart(vals, a) {
@@ -871,7 +890,7 @@ function vCfg() {
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>
-  <p class="fine">Meu Ciclo · versão 36</p>`;
+  <p class="fine">Meu Ciclo · versão 37</p>`;
 }
 
 function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }

@@ -421,3 +421,7 @@ dialog[open]:not(.full){animation:sheetup .28s cubic-bezier(.2,.8,.2,1)}
 .ch:active{transform:scale(.95)}
 .row b{font-weight:700}
 .sw{box-shadow:none}
+
+.d.ov{background:var(--teal) !important;color:#fff !important;font-weight:800;border:0 !important}
+.d.ov::after{display:none}
+.d.ovp{border:2px dotted var(--teal) !important;color:var(--teal);font-weight:700;opacity:calc(.45 + var(--q,1)*.55)}
