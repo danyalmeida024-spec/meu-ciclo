@@ -466,3 +466,4 @@ dialog[open]:not(.full){animation:sheetup .28s cubic-bezier(.2,.8,.2,1)}
 .pdot.mens{background:var(--c-mens)}
 .d.today,.d.today.late,.d.today.per,.d.today.ov{background:linear-gradient(135deg,#a98bff,var(--pink)) !important;color:#fff !important;border:0 !important}
 .pred.p2{background:linear-gradient(145deg,#2fc27f,#188a56)}
+.morerow+.morerow{margin-top:8px}.chip+.morerow{margin-top:14px}
