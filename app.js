@@ -1157,11 +1157,13 @@ function weekCards(w) {
 
 function vGest() {
   const g = pregInfo(), A0 = analyze(), last = A0.g.at(-1), est = g ? null : estConception(A0, TODAY), sugg = est ? add(est.ov, -14) : last ? last.start : '';
-  if (!g) return `<h1>Gestação 🤰</h1><div class="card"><p>Já está grávida? Informe uma das datas e eu acompanho semana a semana: tamanho do bebê, desenvolvimento, exames e contagem para o parto.</p>
-    <label class="f">Data da última menstruação (DUM)</label><input type="date" id="dum" value="${sugg}" max="${TODAY}">${est ? `<p class="note" style="margin:6px 0 0">Sugerida pelo app: concepção por volta de <b>${sd(est.ov)}</b> (entre ${sd(est.lo)} e ${sd(est.hi)}), considerando seus sinais de ovulação, relações e testes — não só a última menstruação. A DUM equivalente é ${fmt(sugg, { day: "numeric", month: "long" })}.</p>` : ''}
-    <label class="f">…ou Data provável do parto (DPP)</label><input type="date" id="dpp">
-    <div style="height:12px"></div><button class="btn" data-act="startpreg">Iniciar acompanhamento</button>
-    <p class="note">Com ciclos irregulares a DUM pode errar por semanas: se você já fez ultrassom, prefira a DPP informada pelo médico.</p></div>`;
+  if (!g) return `<h1>Gestação 🤰</h1><div class="card">
+    ${est ? `<p style="margin:0 0 4px">Pelos seus sinais de ovulação, relações e testes, a concepção seria por volta de</p><p class="big" style="margin:0 0 4px">${fmt(est.ov, { day: 'numeric', month: 'long' })}</p><p class="mute small" style="margin:0 0 12px">Faixa provável: ${sd(est.lo)} a ${sd(est.hi)} · parto previsto em ${fmt(add(est.ov, 266), { day: 'numeric', month: 'long', year: 'numeric' })}. Não uso só a última menstruação.</p>` : `<p>Ainda não tenho dados suficientes do ciclo para estimar a concepção. Informe uma data abaixo.</p>`}
+    <button class="btn" data-act="startpreg">Iniciar com a data estimada</button>
+    <details style="margin-top:14px"><summary class="mute small" style="cursor:pointer">Tenho outra data (ultrassom ou médico)</summary>
+      <label class="f">Data provável do parto (DPP)</label><input type="date" id="dpp">
+      <label class="f">…ou data de início (DUM)</label><input type="date" id="dum" max="${TODAY}">
+      <p class="note">Se preencher uma data, ela é usada no lugar da estimativa. O ultrassom do 1º trimestre é a referência mais confiável.</p></details></div>`;
   const wk = Math.min(Math.max(g.sem, 4), 40), info = WEEKS[wk], tn = g.sem < 14 ? 1 : g.sem < 28 ? 2 : 3;
   const dow = D(TODAY).getDay(), wstart = add(TODAY, -dow);
   const strip = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((n, i) => { const d = add(wstart, i), L = S.logs[d] || {}; return `<button class="wd ${d === TODAY ? 'now' : ''}" data-act="log" data-d="${d}"><small>${d === TODAY ? 'HOJE' : n}</small><b>${D(d).getDate()}</b><i>${(L.symptoms || []).length || L.perda || L.chute ? '●' : ''}</i></button>`; }).join('');
@@ -1363,9 +1365,10 @@ document.addEventListener('click', e => {
     case 'chk': { const k = t.dataset.k, y = scrollY; S.settings.checklist[k] = !S.settings.checklist[k]; save(); render(); scrollTo(0, y); break; }
     case 'startpreg': {
       const dpp = document.getElementById('dpp').value, dum = document.getElementById('dum').value;
-      const d = dpp ? add(dpp, -280) : dum;
+      const manual = !!(dpp || dum), est = manual ? null : estConception(analyze(), TODAY);
+      const d = dpp ? add(dpp, -280) : dum || (est ? add(est.ov, -14) : '');
       if (!d) { notify('Informe a DUM ou a DPP.'); break; }
-      S.settings.pregnancy = { dum: d, manual: true }; S.settings.goal = 'track'; save(); render(); break;
+      S.settings.pregnancy = manual ? { dum: d, manual: true } : { dum: d }; S.settings.goal = 'track'; save(); render(); break;
     }
     case 'endpreg': ask('Sair do modo gestação? Seus registros continuam salvos e o app volta ao modo de ciclo.', 'Encerrar', () => { S.settings.pregnancy = null; S.settings.goal = 'track'; view = 'hoje'; save(); render(); }); break;
     case 'yes': { const f = pending; pending = null; $sheet.close(); if (f) f(); break; }
