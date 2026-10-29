@@ -658,6 +658,7 @@ function phaseSheet(A, kind) {
 }
 
 function vHoje() {
+  if (goalOf() === 'pregnant') return vHojePreg();
   const A = analyze(), last = A.g.at(-1);
   if (!last) return `<h1>Olá 🌸</h1><div class="card"><p>Registre o <b>primeiro dia da última menstruação</b> (ou importe seu histórico em Ajustes).</p><button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje</button></div>`;
   if (goalOf() === 'conceive') return vHojeConceive(A, last);
@@ -872,6 +873,22 @@ const DSEC = [
   { id: 'meds', t: 'Remédios e suplementos', c: '#0c8599', g: [{ k: 'meds', multi: true, o: [['Anticoncepcional', 'Anticoncepcional', '💊'], ['Ácido fólico', 'Ácido fólico', '🌿'], ['Vitaminas', 'Vitaminas', '🧪'], ['Analgésico', 'Analgésico', '🩹'], ['Anti-inflamatório', 'Anti-inflamatório', '💉'], ['Outro', 'Outro', '➕']] }] },
   { id: 'notas', t: 'Anotações', c: '#6c7a89', note: true }
 ];
+const pickSec = id => DSEC.find(x => x.id === id);
+const DSEC_P = [
+  { id: 'sintg', t: 'Sintomas da gestação', c: '#7a5bd1', g: [{ k: 'symptoms', multi: true, o: [['Enjoo', 'Enjoo', '🤢'], ['Vômito', 'Vômito', '🤮'], ['Azia', 'Azia', '🔥'], ['Tontura', 'Tontura', '💫'], ['Cansaço', 'Cansaço', '😴'], ['Sonolência', 'Sonolência', '🥱'], ['Dor lombar', 'Dor lombar', '🔙'], ['Cólica leve', 'Cólica leve', '⚡'], ['Inchaço nas pernas', 'Inchaço nas pernas', '🦶'], ['Seios sensíveis', 'Seios sensíveis', '💗'], ['Aversão a cheiros', 'Aversão a cheiros', '🙄'], ['Desejos', 'Desejos', '🍫'], ['Falta de ar', 'Falta de ar', '😮‍💨'], ['Dor de cabeça', 'Dor de cabeça', '🤕'], ['Constipação', 'Constipação', '🧱'], ['Xixi frequente', 'Xixi frequente', '🚽'], ['Câimbras', 'Câimbras', '🦵'], ['Contrações de treino', 'Contrações de treino', '🌀'], ['Coceira', 'Coceira', '🪶'], ['Dor pélvica', 'Dor pélvica', '📍']] }] },
+  { id: 'bebe', t: 'Movimentos do bebê', c: '#e8456b', g: [{ k: 'chute', multi: false, o: [['Não senti', 'Ainda não senti', '🤫'], ['Poucos', 'Poucos', '🦋'], ['Normais', 'Normais', '👣'], ['Muitos', 'Muitos', '🥊']] }], inputs: [['chutes', 'Contagem de movimentos', 'mov.', '10']] },
+  { id: 'perdas', t: 'Sangramento e perdas', c: '#d6275a', g: [{ k: 'perda', multi: false, o: [['Nenhum', 'Nenhum', '✅'], ['Escape', 'Escape rosado', '🩸'], ['Sangramento', 'Sangramento', '🚨'], ['Corrimento', 'Corrimento aumentado', '💧'], ['Líquido', 'Perda de líquido', '🌊']] }] },
+  { id: 'medidas', t: 'Peso e pressão', c: '#e8871e', inputs: [['peso', 'Peso', 'kg', '65,0'], ['pa_s', 'Pressão máxima', 'mmHg', '120'], ['pa_d', 'Pressão mínima', 'mmHg', '80'], ['glic', 'Glicemia', 'mg/dL', '85']] },
+  { id: 'agua', t: 'Hidratação', c: '#1f8fa8', inputs: [['agua', 'Água', 'copos', '8']] },
+  { ...pickSec('humor') },
+  { ...pickSec('sono') },
+  { id: 'treino', t: 'Atividade física', c: '#2f9e44', g: [{ k: 'treino', multi: true, o: [['Descanso', 'Descanso', '🛋️'], ['Caminhada', 'Caminhada', '🚶'], ['Yoga', 'Yoga / pilates', '🧘'], ['Hidroginástica', 'Hidroginástica', '🏊'], ['Alongamento', 'Alongamento', '🤸'], ['Musculação', 'Musculação leve', '🏋️']] }] },
+  { id: 'meds', t: 'Suplementos e remédios', c: '#0c8599', g: [{ k: 'meds', multi: true, o: [['Ácido fólico', 'Ácido fólico', '🌿'], ['Polivitamínico', 'Vitamina pré-natal', '🧪'], ['Ferro', 'Ferro', '🩸'], ['Cálcio', 'Cálcio', '🦴'], ['Vitamina D', 'Vitamina D', '☀️'], ['Ômega 3', 'Ômega 3', '🐟'], ['Progesterona', 'Progesterona', '💊'], ['Anti-enjoo', 'Anti-enjoo', '🍋'], ['Analgésico', 'Analgésico', '💊']] }] },
+  { id: 'consultas', t: 'Consultas e exames', c: '#4c6ef5', g: [{ k: 'consulta', multi: true, o: [['Pré-natal', 'Consulta pré-natal', '👩‍⚕️'], ['Ultrassom', 'Ultrassom', '📡'], ['Exame de sangue', 'Exame de sangue', '🩸'], ['Exame de urina', 'Exame de urina', '🧫'], ['Vacina', 'Vacina', '💉'], ['Curso gestante', 'Curso de gestante', '🎓']] }] },
+  { ...pickSec('sexo') },
+  { ...pickSec('notas') }
+];
+const daySecs = () => S.settings.pregnancy && DAY && DAY.date >= S.settings.pregnancy.dum ? DSEC_P : DSEC;
 let DAY = null, dayT = 0, toastT = 0;
 const cycleDayOf = date => { const A = analyze(), i = A.g.findLastIndex(x => x.start <= date); return i < 0 ? null : diff(date, A.g[i].start) + 1; };
 const isOn = (g, v) => g.multi ? (DAY.L[g.k] || []).includes(v) : DAY.L[g.k] === v;
@@ -882,14 +899,15 @@ function secCount(sec) {
   if (sec.note && DAY.L.notes) n = 1;
   return n;
 }
+const inpsHtml = (sec, L) => `<div class="inps">${sec.inputs.map(([k, l, u, ph]) => `<label class="inp"><small>${l}</small><span><input data-num="${k}" inputmode="decimal" placeholder="${ph}" value="${L[k] != null ? String(L[k]).replace('.', ',') : ''}"><em>${u}</em></span></label>`).join('')}</div>`;
 function dayCard(sec) {
   const L = DAY.L;
   const body = sec.note ? `<textarea id="dn" rows="3" placeholder="Escreva como foi o seu dia…">${esc(L.notes || '')}</textarea>`
-    : sec.inputs ? `<div class="inps">${sec.inputs.map(([k, l, u, ph]) => `<label class="inp"><small>${l}</small><span><input data-num="${k}" inputmode="decimal" placeholder="${ph}" value="${L[k] != null ? String(L[k]).replace('.', ',') : ''}"><em>${u}</em></span></label>`).join('')}</div>`
+    : sec.inputs && !sec.g ? inpsHtml(sec, L)
     : sec.g.map(g => {
       const o = g.k === 'sex' && L.sex === 'Sim' ? [...g.o, ['Sim', 'Sexo (sem detalhe)', '💞']] : g.o;
       return `${g.l ? `<h4>${g.l}</h4>` : ''}<div class="chs">${o.map(([v, l, e]) => `<button class="ch ${isOn(g, v) ? 'on' : ''}" data-act="ch" data-k="${g.k}" data-v="${esc(v)}" data-multi="${g.multi ? 1 : 0}"><span class="ico">${e}</span><span class="lb">${l}</span></button>`).join('')}</div>`;
-    }).join('');
+    }).join('') + (sec.inputs ? inpsHtml(sec, L) : '');
   const n = secCount(sec);
   return `<section class="dc2" id="sec-${sec.id}" style="--c:${sec.c}"><header><h3>${sec.t}</h3><span class="cnt" data-cnt="${sec.id}">${n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''}</span></header>${body}</section>`;
 }
@@ -897,9 +915,9 @@ function openDay(date) {
   DAY = { date, L: structuredClone(S.logs[date] || {}) };
   const cd = cycleDayOf(date), title = date === TODAY ? 'Hoje' : fmt(date, { weekday: 'short', day: 'numeric', month: 'short' });
   $sheet.className = 'full';
-  $sheet.innerHTML = `<div class="dh"><button class="ib" data-act="close" aria-label="Fechar">✕</button><div class="dt"><b>${title}</b><small>${cd ? cd + 'º dia do ciclo' : 'sem ciclo registrado'}</small></div><span class="dnav"><button class="ib" data-act="dprev" aria-label="Dia anterior">‹</button><button class="ib" data-act="dnext" ${date >= TODAY ? 'disabled' : ''} aria-label="Próximo dia">›</button></span></div>
-  <div class="ds"><input id="dq" type="search" placeholder="Buscar sintoma, humor…" autocomplete="off"><div class="jumps">${DSEC.map(x => `<button class="jp" data-act="jump" data-id="${x.id}" style="--c:${x.c}">${x.t}</button>`).join('')}</div></div>
-  <div class="dsc" id="dsc">${DSEC.map(dayCard).join('')}<div class="dend"></div></div><div class="toast" id="toast">Salvo ✓</div>`;
+  $sheet.innerHTML = `<div class="dh"><button class="ib" data-act="close" aria-label="Fechar">✕</button><div class="dt"><b>${title}</b><small>${daySecs() === DSEC_P ? `${Math.floor(diff(date, S.settings.pregnancy.dum) / 7)}s ${diff(date, S.settings.pregnancy.dum) % 7}d de gestação` : cd ? cd + 'º dia do ciclo' : 'sem ciclo registrado'}</small></div><span class="dnav"><button class="ib" data-act="dprev" aria-label="Dia anterior">‹</button><button class="ib" data-act="dnext" ${date >= TODAY ? 'disabled' : ''} aria-label="Próximo dia">›</button></span></div>
+  <div class="ds"><input id="dq" type="search" placeholder="Buscar sintoma, humor…" autocomplete="off"><div class="jumps">${daySecs().map(x => `<button class="jp" data-act="jump" data-id="${x.id}" style="--c:${x.c}">${x.t}</button>`).join('')}</div></div>
+  <div class="dsc" id="dsc">${daySecs().map(dayCard).join('')}<div class="dend"></div></div><div class="toast" id="toast">Salvo ✓</div>`;
   if (!$sheet.open) $sheet.showModal();
 }
 function commitDay() {
@@ -910,7 +928,7 @@ function commitDay() {
   const t = document.getElementById('toast'); if (t) { t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 900); }
 }
 function updateCounts() {
-  DSEC.forEach(sec => { const el = document.querySelector(`[data-cnt="${sec.id}"]`); if (!el) return; const n = secCount(sec); el.textContent = n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''; });
+  daySecs().forEach(sec => { const el = document.querySelector(`[data-cnt="${sec.id}"]`); if (!el) return; const n = secCount(sec); el.textContent = n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''; });
 }
 function filterDay(q) {
   q = norm2(q.trim());
@@ -982,6 +1000,43 @@ function pregInfo() {
   if (!p) return null;
   const dias = diff(TODAY, p.dum), sem = Math.floor(dias / 7), dpp = add(p.dum, 280);
   return { dum: p.dum, dias, sem, d: dias % 7, dpp, left: diff(dpp, TODAY), tri: sem < 14 ? '1º trimestre' : sem < 28 ? '2º trimestre' : '3º trimestre' };
+}
+function conceptionInfo(g) {
+  const ov = add(g.dum, 14), rels = Object.keys(S.logs).filter(d => d >= add(ov, -5) && d <= add(ov, 1) && ['Sem proteção', 'Sim'].includes(S.logs[d].sex) && !pillCovered(d)).sort();
+  const ps = rels.map(d => ({ d, p: WIL[String(diff(d, ov))] || 0 })), tot = ps.reduce((a, x) => a + x.p, 0) || 1;
+  ps.forEach(x => x.share = Math.round(x.p / tot * 100));
+  const best = ps.slice().sort((a, b) => b.p - a.p)[0] || null;
+  return { ov, ps, best, imp: add(ov, 7) };
+}
+function vHojePreg() {
+  const g = pregInfo(), A = analyze(), ci = conceptionInfo(g), wk = Math.min(Math.max(g.sem, 4), 40), tn = g.sem < 14 ? 1 : g.sem < 28 ? 2 : 3;
+  const R = 44, C = 2 * Math.PI * R, pct = Math.min(Math.max(g.dias, 0) / 280, 1);
+  const alerts = Object.keys(S.logs).filter(d => diff(TODAY, d) >= 0 && diff(TODAY, d) <= 3 && ['Sangramento', 'Líquido'].includes(S.logs[d].perda));
+  const ex = EXAMS.find(([a, b]) => g.sem <= b), L = S.logs[TODAY] || {}, folic = (L.meds || []).includes('Ácido fólico');
+  const concTxt = ci.best ? `Relação provável: <b>${fmt(ci.best.d, { day: 'numeric', month: 'long' })}</b>${ci.ps.length > 1 ? ` (≈${ci.best.share}%)` : ''}` : `Concepção estimada por volta de <b>${fmt(ci.ov, { day: 'numeric', month: 'long' })}</b>`;
+  INFO = {
+    conc: ['Quando foi a concepção?', `<p>Pela data de início usada (${fmt(g.dum, { day: 'numeric', month: 'long' })}), a ovulação teria sido por volta de <b>${fmt(ci.ov, { day: 'numeric', month: 'long' })}</b> e a implantação do embrião em ~<b>${fmt(ci.imp, { day: 'numeric', month: 'long' })}</b>.</p>${ci.ps.length ? `<p>Relações sem proteção na janela da ovulação:</p>${ci.ps.map(x => `<p style="margin:4px 0">• <b>${fmt(x.d, { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${x.share}% de probabilidade relativa</p>`).join('')}<p class="mute small">A probabilidade usa a chance de cada dia em relação à ovulação (Wilcox, 1995). O espermatozoide sobrevive até ~5 dias, então a relação provável pode ser anterior à ovulação.</p>` : '<p>Não há relação sem proteção registrada nesta janela.</p>'}<p class="note">Estimativa. Só o ultrassom do 1º trimestre fixa a data com segurança, e a data do parto muda com ele.</p>`],
+    dpp: ['Data provável do parto', `<p>Calculada em 40 semanas (280 dias) a partir de ${fmt(g.dum, { day: 'numeric', month: 'long', year: 'numeric' })}: <b>${fmt(g.dpp, { day: 'numeric', month: 'long', year: 'numeric' })}</b>.</p><p>Só ~5% dos bebês nascem exatamente nessa data; o normal é entre 37 e 42 semanas (de ${fmt(add(g.dum, 259), { day: 'numeric', month: 'short' })} a ${fmt(add(g.dum, 294), { day: 'numeric', month: 'short' })}). Com ciclo irregular o ultrassom do 1º trimestre corrige a data.</p>`]
+  };
+  const seg = [0, 1, 2].map(i => { const a = i * 94, w = Math.min(Math.max(g.dias - a, 0), 94) / 94 * 100; return `<i><b style="width:${w}%"></b></i>`; }).join('');
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  <button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
+  ${alerts.length ? `<div class="banner"><span>Sangramento ou perda de líquido registrados: procure atendimento obstétrico</span></div>` : ''}
+  <section class="hh st-preg">
+    <div class="hhb" role="button" tabindex="0" data-act="startgest"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>semana</small><b>${g.sem}</b></div></div>
+    <div class="ht"><h2>${g.sem} semanas e ${g.d} dia${g.d === 1 ? '' : 's'}</h2><p>${g.tri} · ${Math.max(g.left, 0)} dias para o parto</p><p class="phint">Ver o bebê e a semana ›</p></div></div>
+    <div class="pfacts"><button data-act="info" data-k="dpp"><small>🎀 Parto previsto</small><b>${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</b></button><button data-act="info" data-k="conc"><small>💞 Concepção</small><b>${ci.best ? sd(ci.best.d) : '~' + sd(ci.ov)}</b></button></div>
+    <div class="tri">${seg}</div><div class="trl"><span>1º tri</span><span>2º tri</span><span>3º tri</span></div></div>
+  </section>
+  <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar sintomas de hoje'}</button>
+  <div class="nstep"><span class="nsi">🌿</span><span class="nst"><small>Hoje</small><b>${folic ? 'Ácido fólico de hoje ✓' : 'Tome o ácido fólico / vitamina pré-natal'}</b><em>${concTxt}</em></span></div>
+  <div class="tiles4">
+    <button class="tile" data-go="gest"><small>Bebê</small><b>${fmtSize(wk).split(' · ')[0]}</b><em>${ITEM[wk][0]}</em></button>
+    <button class="tile" data-act="info" data-k="dpp"><small>Faltam</small><b>${Math.max(g.left, 0)} dias</b><em>${Math.ceil(Math.max(g.left, 0) / 7)} semanas</em></button>
+    <button class="tile" data-go="gest"><small>Próximo exame</small><b style="font-size:14px">${ex ? ex[2].split(':')[0].replace(/ \(.*\)/, '') : 'Pré-natal'}</b><em>${ex ? `${ex[0]}–${ex[1]} semanas` : ''}</em></button>
+    <button class="tile" data-act="info" data-k="conc"><small>Implantação</small><b>${sd(ci.imp)}</b><em>ovulação ~${sd(ci.ov)}</em></button>
+  </div>
+  <p class="fine">Estimativas · confirme datas com ultrassom e seu obstetra</p>`;
 }
 function pregBanner() {
   const g = pregInfo();
@@ -1082,7 +1137,7 @@ function vGest() {
     <p class="note">Com ciclos irregulares a DUM pode errar por semanas: se você já fez ultrassom, prefira a DPP informada pelo médico.</p></div>`;
   const wk = Math.min(Math.max(g.sem, 4), 40), info = WEEKS[wk], tn = g.sem < 14 ? 1 : g.sem < 28 ? 2 : 3;
   const dow = D(TODAY).getDay(), wstart = add(TODAY, -dow);
-  const strip = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((n, i) => { const d = add(wstart, i), L = S.logs[d] || {}; return `<button class="wd ${d === TODAY ? 'now' : ''}" data-act="log" data-d="${d}"><small>${d === TODAY ? 'HOJE' : n}</small><b>${D(d).getDate()}</b><i>${L.sex && L.sex !== 'Não' ? '♥' : ''}</i></button>`; }).join('');
+  const strip = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((n, i) => { const d = add(wstart, i), L = S.logs[d] || {}; return `<button class="wd ${d === TODAY ? 'now' : ''}" data-act="log" data-d="${d}"><small>${d === TODAY ? 'HOJE' : n}</small><b>${D(d).getDate()}</b><i>${(L.symptoms || []).length || L.perda || L.chute ? '●' : ''}</i></button>`; }).join('');
   INFO = {
     det: ['Detalhes', `<div class="stats"><div><div class="mute small">Idade gestacional</div><div class="big">${g.sem}s ${g.d}d</div></div><div><div class="mute small">Trimestre</div><div class="big">${tn}º</div></div><div><div class="mute small">Parto previsto</div><div class="big" style="font-size:16px">${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div><div><div class="mute small">Faltam</div><div class="big">${Math.max(g.left, 0)} dias</div></div><div><div class="mute small">Tamanho do bebê</div><div class="big" style="font-size:16px">${fmtSize(wk)}</div></div><div><div class="mute small">Compara-se a</div><div class="big" style="font-size:16px">${ITEM[wk][0]}</div></div></div><p class="note">DUM considerada: ${fmt(g.dum, { day: 'numeric', month: 'long', year: 'numeric' })}. Medidas aproximadas (comprimento até a 19ª semana: cabeça–nádega; depois, cabeça–pés). Com ciclo irregular, confirme a data pelo ultrassom do 1º trimestre.</p><button class="chip" data-act="editdum">Ajustar data</button>`],
     baby: ['Bebê · ' + g.sem + ' semanas', `<p class="big" style="margin:0 0 6px">${fmtSize(wk)}</p><p>Do tamanho de <b>${ITEM[wk][0]}</b> ${ITEM[wk][1]}.</p><p>${info[1]}</p><p class="note">Tamanhos são médias aproximadas.</p>`],
@@ -1389,7 +1444,7 @@ document.addEventListener('input', e => {
   if (!DAY) return;
   if (el.id === 'dn') { const v = el.value.trim(); if (v) DAY.L.notes = v; else delete DAY.L.notes; }
   else if (el.dataset.num) {
-    const k = el.dataset.num, v = parseFloat(el.value.replace(',', '.')), ok = k === 'temp' ? v >= 34 && v <= 42 : v >= 25 && v <= 300;
+    const k = el.dataset.num, v = parseFloat(el.value.replace(',', '.')), ok = k === 'temp' ? v >= 34 && v <= 42 : k === 'agua' || k === 'chutes' ? v >= 0 && v <= 200 : v >= 25 && v <= 300;
     if (ok) DAY.L[k] = v; else delete DAY.L[k];
   } else return;
   clearTimeout(dayT); dayT = setTimeout(() => { commitDay(); updateCounts(); }, 450);
