@@ -467,9 +467,7 @@ function vHojeConceive(A, last) {
     c_tries: ['Tentativas', `<p><b>${tries}</b> relação(ões) dentro da janela fértil deste ciclo.</p><p>O ideal é a cada 1–2 dias durante a janela.</p>`]
   };
   const since = S.settings.conceiveSince ? A.g.filter(g => g.start >= S.settings.conceiveSince).length : 0;
-  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-  <button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${modeSwitch()}
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1></div>
   <section class="hh st-${H[0]}">
     <div class="goalpill">🌱 Modo engravidar${since ? ` · ciclo ${since}` : ''}</div>
     <div class="hhb" role="button" tabindex="0" data-act="phase" data-k="${H[0]}" aria-label="Entender esta fase"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -713,9 +711,8 @@ function vHoje() {
   };
   const banner = beyond && !S.settings.pregnancy ? `<button class="banner" data-act="info" data-k="h_alert"><span>${pc?.hasNeg ? `Teste negativo em ${sd(pc.lastNeg)}` : 'Faça um teste de gravidez'}</span><b>Ver ›</b></button>` : '';
   const dk = isDark();
-  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-  <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${modeSwitch()}${pregBanner()}${banner}
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1></div>
+  ${pregBanner()}${banner}
   <section class="hh st-${st}">
     <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
     <div class="hhb" role="button" tabindex="0" data-act="phase" data-k="${st}" aria-label="Entender esta fase"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -852,6 +849,8 @@ function vAna() {
 function vCfg() {
   const s = S.settings;
   return `<h1>Ajustes</h1>
+  <div class="card"><h2>Aparência</h2><button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Modo noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
+  ${modeSwitch()}
   ${(() => { const g = pregInfo(); return g ? `<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Em acompanhamento: ${g.sem}s ${g.d}d · parto previsto ${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</p><button class="btn alt" data-go="gest">Abrir gestação</button><div style="height:8px"></div><button class="btn alt" data-act="editdum">Ajustar data</button><div style="height:8px"></div><button class="btn danger" data-act="endpreg">Sair do modo gestação</button></div>` : '<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Teve teste positivo ou já está grávida? Ative o acompanhamento semana a semana.</p><button class="btn alt" data-act="startgest">Acompanhar gestação</button></div>'; })()}
   <div class="card"><h2>Valores iniciais</h2><p class="mute small">Usados até o app ter histórico suficiente.</p>
     <div class="two"><div><label class="f">Ciclo (dias)</label><input type="number" min="21" max="45" data-set="cycle" value="${s.cycle}"></div><div><label class="f">Menstruação (dias)</label><input type="number" min="2" max="10" data-set="period" value="${s.period}"></div></div>
@@ -900,7 +899,7 @@ const DSEC = [
 ];
 const pickSec = id => DSEC.find(x => x.id === id);
 const DSEC_P = [
-  { id: 'sintg', t: 'Sintomas da gestação', c: '#7a5bd1', g: [{ k: 'symptoms', multi: true, o: [['Enjoo', 'Enjoo', '🤢'], ['Vômito', 'Vômito', '🤮'], ['Azia', 'Azia', '🔥'], ['Tontura', 'Tontura', '💫'], ['Cansaço', 'Cansaço', '😴'], ['Sonolência', 'Sonolência', '🥱'], ['Dor lombar', 'Dor lombar', '🔙'], ['Cólica leve', 'Cólica leve', '⚡'], ['Inchaço nas pernas', 'Inchaço nas pernas', '🦶'], ['Seios sensíveis', 'Seios sensíveis', '💗'], ['Aversão a cheiros', 'Aversão a cheiros', '🙄'], ['Desejos', 'Desejos', '🍫'], ['Falta de ar', 'Falta de ar', '😮‍💨'], ['Dor de cabeça', 'Dor de cabeça', '🤕'], ['Constipação', 'Constipação', '🧱'], ['Xixi frequente', 'Xixi frequente', '🚽'], ['Câimbras', 'Câimbras', '🦵'], ['Contrações de treino', 'Contrações de treino', '🌀'], ['Coceira', 'Coceira', '🪶'], ['Dor pélvica', 'Dor pélvica', '📍']] }] },
+  { id: 'sintg', t: 'Sintomas da gestação', c: '#7a5bd1', g: [{ k: 'symptoms', multi: true, o: [['Enjoo', 'Enjoo', '🤢'], ['Vômito', 'Vômito', '🤮'], ['Azia', 'Azia', '🔥'], ['Tontura', 'Tontura', '💫'], ['Cansaço', 'Cansaço', '😴'], ['Sonolência', 'Sonolência', '🥱'], ['Dor lombar', 'Dor lombar', '🔙'], ['Cólica leve', 'Cólica leve', '⚡'], ['Inchaço nas pernas', 'Inchaço nas pernas', '🦶'], ['Seios sensíveis', 'Seios sensíveis', '💗'], ['Aversão a cheiros', 'Aversão a cheiros', '🙄'], ['Desejos', 'Desejos', '🍫'], ['Falta de ar', 'Falta de ar', '😮‍💨'], ['Dor de cabeça', 'Dor de cabeça', '🤕'], ['Constipação', 'Constipação', '🧱'], ['Xixi frequente', 'Xixi frequente', '🚽'], ['Câimbras', 'Câimbras', '🦵'], ['Contrações de treino', 'Contrações de treino', '🌀'], ['Coceira', 'Coceira', '🪶'], ['Dor pélvica', 'Dor pélvica', '📍'], ['Insônia', 'Insônia', '🌙'], ['Nariz entupido', 'Nariz entupido', '👃'], ['Gengiva sangrando', 'Gengiva sangrando', '🦷']] }] },
   { id: 'bebe', t: 'Movimentos do bebê', c: '#e8456b', g: [{ k: 'chute', multi: false, o: [['Não senti', 'Ainda não senti', '🤫'], ['Poucos', 'Poucos', '🦋'], ['Normais', 'Normais', '👣'], ['Muitos', 'Muitos', '🥊']] }], inputs: [['chutes', 'Contagem de movimentos', 'mov.', '10']] },
   { id: 'perdas', t: 'Sangramento e perdas', c: '#d6275a', g: [{ k: 'perda', multi: false, o: [['Nenhum', 'Nenhum', '✅'], ['Escape', 'Escape rosado', '🩸'], ['Sangramento', 'Sangramento', '🚨'], ['Corrimento', 'Corrimento aumentado', '💧'], ['Líquido', 'Perda de líquido', '🌊']] }] },
   { id: 'medidas', t: 'Peso e pressão', c: '#e8871e', inputs: [['peso', 'Peso', 'kg', '65,0'], ['pa_s', 'Pressão máxima', 'mmHg', '120'], ['pa_d', 'Pressão mínima', 'mmHg', '80'], ['glic', 'Glicemia', 'mg/dL', '85']] },
@@ -930,8 +929,9 @@ function dayCard(sec) {
   const body = sec.note ? `<textarea id="dn" rows="3" placeholder="Escreva como foi o seu dia…">${esc(L.notes || '')}</textarea>`
     : sec.inputs && !sec.g ? inpsHtml(sec, L)
     : sec.g.map(g => {
-      const o = g.k === 'sex' && L.sex === 'Sim' ? [...g.o, ['Sim', 'Sexo (sem detalhe)', '💞']] : g.o;
-      return `${g.l ? `<h4>${g.l}</h4>` : ''}<div class="chs">${o.map(([v, l, e]) => `<button class="ch ${isOn(g, v) ? 'on' : ''}" data-act="ch" data-k="${g.k}" data-v="${esc(v)}" data-multi="${g.multi ? 1 : 0}"><span class="ico">${e}</span><span class="lb">${l}</span></button>`).join('')}</div>`;
+      let o = g.k === 'sex' && L.sex === 'Sim' ? [...g.o, ['Sim', 'Sexo (sem detalhe)', '💞']] : g.o, rec = [];
+      if (sec.id === 'sintg') { const w = Math.floor(diff(DAY.date, S.settings.pregnancy.dum) / 7); rec = sympFor(w).map(x => x[2]); o = [...o.filter(x => rec.includes(x[0])), ...o.filter(x => !rec.includes(x[0]))]; }
+      return `${g.l ? `<h4>${g.l}</h4>` : ''}<div class="chs">${o.map(([v, l, e]) => `<button class="ch ${isOn(g, v) ? 'on' : ''} ${rec.includes(v) ? 'rec' : ''}" data-act="ch" data-k="${g.k}" data-v="${esc(v)}" data-multi="${g.multi ? 1 : 0}"><span class="ico">${e}</span><span class="lb">${l}</span></button>`).join('')}</div>`;
     }).join('') + (sec.inputs ? inpsHtml(sec, L) : '');
   const n = secCount(sec);
   return `<section class="dc2" id="sec-${sec.id}" style="--c:${sec.c}"><header><h3>${sec.t}</h3><span class="cnt" data-cnt="${sec.id}">${n ? (sec.note ? 'escrito' : `${n} selecionado${n > 1 ? 's' : ''}`) : ''}</span></header>${body}</section>`;
@@ -1045,8 +1045,7 @@ function vHojePreg() {
     dpp: ['Data provável do parto', `<p>Calculada em 40 semanas (280 dias) a partir de ${fmt(g.dum, { day: 'numeric', month: 'long', year: 'numeric' })}: <b>${fmt(g.dpp, { day: 'numeric', month: 'long', year: 'numeric' })}</b>.</p><p>Só ~5% dos bebês nascem exatamente nessa data; o normal é entre 37 e 42 semanas (de ${fmt(add(g.dum, 259), { day: 'numeric', month: 'short' })} a ${fmt(add(g.dum, 294), { day: 'numeric', month: 'short' })}). Com ciclo irregular o ultrassom do 1º trimestre corrige a data.</p>`]
   };
   const seg = [0, 1, 2].map(i => { const a = i * 94, w = Math.min(Math.max(g.dias - a, 0), 94) / 94 * 100; return `<i><b style="width:${w}%"></b></i>`; }).join('');
-  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-  <button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
+  return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1></div>
   ${alerts.length ? `<div class="banner"><span>Sangramento ou perda de líquido registrados: procure atendimento obstétrico</span></div>` : ''}
   <section class="hh st-preg">
     <div class="hhb" role="button" tabindex="0" data-act="startgest"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>semana</small><b>${g.sem}</b></div></div>
@@ -1093,6 +1092,38 @@ const DAILY = [
 let INFO = {};
 
 const ITEM = {4:['uma semente de papoula','•'],5:['uma semente de gergelim','•'],6:['um grão de lentilha','🟤'],7:['um grão de feijão','🫘'],8:['um mirtilo grande','🫐'],9:['uma azeitona','🫒'],10:['uma uva grande','🍇'],11:['um morango','🍓'],12:['um limão','🍋'],13:['um pêssego','🍑'],14:['um tomate','🍅'],15:['uma maçã','🍎'],16:['um abacate','🥑'],17:['uma pera','🍐'],18:['uma batata-doce','🍠'],19:['uma manga','🥭'],20:['uma banana','🍌'],21:['uma cenoura grande','🥕'],22:['um pepino','🥒'],23:['uma manga grande','🥭'],24:['uma espiga de milho','🌽'],25:['uma couve-flor','🥦'],26:['uma alface','🥬'],27:['um repolho pequeno','🥬'],28:['uma berinjela','🍆'],29:['uma abóbora pequena','🎃'],30:['um repolho grande','🥬'],31:['um coco','🥥'],32:['um abacaxi pequeno','🍍'],33:['um abacaxi','🍍'],34:['um melão cantalupo','🍈'],35:['um melão','🍈'],36:['uma alface-romana grande','🥬'],37:['uma acelga','🥬'],38:['um alho-poró','🧅'],39:['uma abóbora','🎃'],40:['uma melancia pequena','🍉']};
+const TRIL = w => w < 14 ? [1, 13, '1º trimestre'] : w < 28 ? [14, 27, '2º trimestre'] : [28, 40, '3º trimestre'];
+const triPos = w => { const [a, b, n] = TRIL(w), f = (w - a) / (b - a + 1); return `${f < .34 ? 'início' : f < .67 ? 'meio' : 'fim'} do ${n}`; };
+// [semana inicial, final, sintoma (igual ao registro), por que acontece]
+const SYMP = [
+  [4, 13, 'Enjoo', 'Costuma começar por volta da 6ª semana e ter pico entre 9 e 12; melhora perto da 14ª'],
+  [4, 13, 'Cansaço', 'A progesterona e o corpo trabalhando a mais deixam o sono e o cansaço fortes'],
+  [4, 12, 'Seios sensíveis', 'Os seios ficam doloridos e maiores com o aumento dos hormônios'],
+  [4, 13, 'Xixi frequente', 'O útero e o aumento do sangue sobrecarregam os rins e a bexiga'],
+  [4, 10, 'Cólica leve', 'Pequenas cólicas ou repuxões enquanto o útero se adapta e o embrião se fixa'],
+  [5, 14, 'Aversão a cheiros', 'O olfato fica aguçado e alguns cheiros e alimentos passam a incomodar'],
+  [5, 16, 'Desejos', 'Desejos e aversões alimentares são comuns'],
+  [6, 20, 'Constipação', 'A progesterona deixa o intestino mais lento'],
+  [8, 14, 'Tontura', 'Pressão mais baixa e açúcar oscilando: levante devagar e coma a cada poucas horas'],
+  [8, 20, 'Dor de cabeça', 'Mudanças hormonais e de volume de sangue; hidrate-se e descanse'],
+  [10, 40, 'Azia', 'A progesterona relaxa a válvula do estômago, e o útero cresce e empurra o estômago'],
+  [14, 27, 'Gengiva sangrando', 'Gengivas mais sensíveis e inchadas; vale ir ao dentista'],
+  [14, 27, 'Nariz entupido', 'A circulação aumentada incha a mucosa do nariz'],
+  [16, 26, 'Dor pélvica', 'Dor em pontada na lateral da barriga: ligamentos se esticando conforme o útero cresce'],
+  [18, 40, 'Dor lombar', 'O peso da barriga muda sua postura e sobrecarrega a lombar'],
+  [18, 27, 'Movimentos do bebê', 'Os primeiros movimentos costumam ser sentidos entre 18 e 22 semanas'],
+  [20, 40, 'Câimbras', 'Câimbras nas pernas, mais comuns à noite; alongue e converse sobre magnésio/cálcio com seu médico'],
+  [20, 40, 'Coceira', 'A pele da barriga estica; coceira intensa nas mãos e pés deve ser avaliada'],
+  [20, 33, 'Contrações de treino', 'Contrações de Braxton Hicks: irregulares, sem ritmo e que passam com repouso ou água'],
+  [24, 40, 'Inchaço nas pernas', 'Retenção de líquido, mais no fim do dia; eleve as pernas'],
+  [26, 40, 'Insônia', 'Dificuldade de achar posição e acordar para urinar; durma de lado'],
+  [28, 40, 'Falta de ar', 'O útero sobe e empurra o diafragma; melhora quando o bebê encaixa'],
+  [28, 40, 'Xixi frequente', 'O bebê pressiona a bexiga'],
+  [34, 40, 'Contrações de treino', 'Mais frequentes. Se virarem regulares e mais fortes, pode ser trabalho de parto'],
+  [34, 40, 'Dor pélvica', 'A cabeça do bebê encaixa e pressiona a pelve']
+];
+const sympFor = w => SYMP.filter(([a, b]) => w >= a && w <= b);
+const ALERT_G = w => ['Sangramento vaginal ou perda de líquido', 'Dor forte ou constante na barriga', 'Febre, ou dor ao urinar', w >= 20 ? 'Dor de cabeça forte com visão embaçada ou inchaço súbito no rosto e mãos (pode ser pré-eclâmpsia)' : 'Vômitos que não deixam beber nem comer nada', ...(w >= 28 ? ['Bebê bem menos ativo que o habitual'] : []), ...(w < 37 && w >= 20 ? ['Contrações regulares antes das 37 semanas'] : [])];
 const MILES = [[5,'O tubo neural (futura medula e cérebro) se fecha e o coração começa a se formar'],[6,'O coração já bate (cerca de 110 bpm) e aparece no ultrassom; surgem os brotos de braços e pernas'],[7,'As mãos surgem como pequenas "pás"; formam-se fígado e intestino'],[8,'Os dedos das mãos se separam, pálpebras e orelhas se formam e a cauda desaparece'],[9,'Todos os órgãos principais já estão formados; começam os dedos dos pés'],[10,'Fim da fase embrionária — agora é um feto. Começam unhas e ossos; os rins produzem urina'],[11,'Os genitais começam a se diferenciar; as mãos abrem e fecham'],[12,'Surgem os reflexos e o intestino se acomoda dentro do abdome'],[13,'Formam-se as impressões digitais e as cordas vocais'],[14,'O pescoço se define e o bebê engole líquido amniótico'],[16,'Os movimentos ficam vigorosos (você ainda pode não sentir)'],[18,'A audição se desenvolve; os primeiros movimentos costumam ser sentidos entre 18 e 22 semanas'],[20,'Cobertura de vérnix e lanugo; o sexo costuma ser visível ao ultrassom'],[22,'Sobrancelhas e pálpebras ficam definidas'],[24,'Os pulmões começam a produzir surfactante; com UTI neonatal já pode sobreviver fora do útero'],[26,'Os olhos começam a abrir'],[28,'Ciclos de sono e vigília; ele pisca'],[30,'A medula óssea assume a produção de células do sangue'],[32,'Unhas completas; a maioria já está de cabeça para baixo'],[34,'Pulmões quase maduros; a gordura sob a pele aumenta'],[36,'Preparando-se para nascer; a cabeça começa a encaixar na pelve'],[37,'Considerado a termo precoce'],[39,'A termo completo'],[40,'Data provável do parto']];
 let gv = null;
 
@@ -1151,7 +1182,8 @@ function weekCards(w) {
   const done = MILES.filter(m => m[0] <= wk).slice(-4), next = MILES.find(m => m[0] > wk);
   return `<div class="card"><h2>Tamanho do bebê · semana ${wk}</h2><div class="szrow"><div class="emo">${it[1]}</div><div><div class="big cap">${it[0].replace(/^(um|uma) /, '')}</div><div class="mute">${fmtSize(wk)}</div></div></div>
     <div class="ruler"><i style="width:max(${(cm / 51.2 * 100).toFixed(1)}%,8px)"></i></div><div class="mute small" style="display:flex;justify-content:space-between"><span>agora</span><span>no parto ≈ 51 cm · 3,4 kg</span></div></div>
-  <div class="card"><h2>Desenvolvimento</h2>${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('') || '<p class="mute">O desenvolvimento começa agora.</p>'}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p></div>`;
+  <div class="card"><h2>Desenvolvimento</h2>${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('') || '<p class="mute">O desenvolvimento começa agora.</p>'}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p></div>
+  <div class="card"><h2>Sintomas comuns · ${wk}ª semana</h2><p class="mute small" style="margin:0 0 8px">${triPos(wk)}</p>${sympFor(wk).map(([, , t, why]) => `<p class="sy"><b>${t}</b><span>${why}</span></p>`).join('')}<div class="alertbox"><b>Procure atendimento se tiver</b><ul>${ALERT_G(wk).map(x => `<li>${x}</li>`).join('')}</ul></div><p class="note">Nem toda gestante sente tudo isso, e a falta de sintomas também é normal. Em caso de dúvida, fale com seu obstetra.</p></div>`;
 }
 
 function vGest() {
