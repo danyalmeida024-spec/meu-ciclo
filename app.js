@@ -1062,8 +1062,7 @@ function vHojePreg() {
     <button class="tile" data-go="gest"><small>Próximo exame</small><b style="font-size:14px">${ex ? ex[2].split(':')[0].replace(/ \(.*\)/, '') : 'Pré-natal'}</b><em>${ex ? `${ex[0]}–${ex[1]} semanas` : ''}</em></button>
     <button class="tile" data-act="info" data-k="conc"><small>Implantação</small><b>${sd(ci.imp)}</b><em>ovulação ~${sd(ci.ov)}</em></button>
   </div>
-  <p class="fine">Estimativas · confirme datas com ultrassom e seu obstetra</p>
-  <button class="quiet" data-act="endpreg">Sair do modo gestação</button>`;
+  <p class="fine">Estimativas · confirme datas com ultrassom e seu obstetra</p>`;
 }
 function pregBanner() {
   const g = pregInfo();
