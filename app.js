@@ -838,7 +838,7 @@ function vAna() {
   const reg = A.spread == null ? '—' : A.spread <= 7 ? 'Regular' : A.spread <= 9 ? 'Limítrofe' : 'Irregular';
   const conceive = goalOf() === 'conceive' && A.g.length;
   return `<h1>Análises</h1>
-  ${conceive ? triesCard(A) + `<div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>` : ''}
+  ${conceive ? triesCard(A) : ''}
   <div class="card"><h2>Resumo</h2><div class="stats">
     <div><div class="mute small">Ciclo médio</div><div class="big">${A.n ? Math.round(A.mean) + ' dias' : '—'}</div></div>
     <div><div class="mute small">Menstruação</div><div class="big">${A.g.length ? A.period + ' dias' : '—'}</div></div>
@@ -847,11 +847,9 @@ function vAna() {
     <div><div class="mute small">Fase lútea</div><div class="big">${A.luteal} dias</div></div>
     <div><div class="mute small">Ciclos registrados</div><div class="big">${A.g.length}</div></div>
   </div><p class="note">${A.lutMeasured >= 2 ? 'Fase lútea medida pelas suas ovulações confirmadas.' : 'Fase lútea padrão (14). Com 2+ ovulações confirmadas (LH ou temperatura) o app mede a sua.'}</p></div>
-  <div class="card"><h2>Interpretação</h2>${interpret(A)}</div>
-  ${conceive ? '' : `<div class="card"><h2>Seus sinais de ovulação</h2>${signalsCard(A)}</div>`}
+  <div class="list">${more('Interpretação', interpret(A), reg, '🩺')}${more('Seus sinais de ovulação', signalsCard(A), '', '🥚')}${more('Padrões por fase', patterns(A), '', '🌙')}</div>
   <div class="card"><h2>Duração dos ciclos</h2>${A.lens.length ? barChart(A.lens.slice(-12), avg(A.lens.slice(-12))) : '<p class="mute">Precisa de pelo menos 2 menstruações registradas.</p>'}</div>
-  <div class="card"><h2>Temperatura basal (ciclo atual)</h2>${tempChart(A)}</div>
-  <div class="card"><h2>Padrões por fase</h2>${patterns(A)}</div>
+  ${(() => { const t = tempChart(A); return t.includes('class="mute"') ? `<div class="list">${more('Temperatura basal', t, 'sem dados', '🌡️')}</div>` : `<div class="card"><h2>Temperatura basal (ciclo atual)</h2>${t}</div>`; })()}
   <button class="btn alt" data-go="guia">Guia de saúde baseado em diretrizes</button>`;
 }
 
@@ -861,13 +859,13 @@ function vCfg() {
   <div class="card"><h2>Aparência</h2><button class="sw" data-act="theme" role="switch" aria-checked="${isDark()}" aria-label="Modo noturno"><span>Modo noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
   ${modeSwitch()}
   ${(() => { const g = pregInfo(); return g ? `<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Em acompanhamento: ${g.sem}s ${g.d}d · parto previsto ${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</p><button class="btn alt" data-go="gest">Abrir gestação</button><div style="height:8px"></div><button class="btn alt" data-act="editdum">Ajustar data</button><div style="height:8px"></div><button class="btn danger" data-act="endpreg">Sair do modo gestação</button></div>` : '<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Teve teste positivo ou já está grávida? Ative o acompanhamento semana a semana.</p><button class="btn alt" data-act="startgest">Acompanhar gestação</button></div>'; })()}
-  <div class="card"><h2>Valores iniciais</h2><p class="mute small">Usados até o app ter histórico suficiente.</p>
+  <div class="card"><h2>Valores iniciais</h2><p class="note">Usados até o app ter histórico suficiente.</p>
     <div class="two"><div><label class="f">Ciclo (dias)</label><input type="number" min="21" max="45" data-set="cycle" value="${s.cycle}"></div><div><label class="f">Menstruação (dias)</label><input type="number" min="2" max="10" data-set="period" value="${s.period}"></div></div>
     <label class="f">Fase lútea (dias)</label><input type="number" min="10" max="16" data-set="luteal" value="${s.luteal}"></div>
-  <div class="card"><h2>Importar histórico</h2><p class="mute small">Cole uma menstruação por linha, do jeito que estiver no seu outro app. Ex.: <code>15/09/2026 a 20/09/2026</code>, <code>15/09/2026 5</code> (5 dias) ou só <code>15/09</code>.</p>
+  <div class="card"><h2>Importar histórico</h2><p class="note">Cole uma menstruação por linha, do jeito que estiver no seu outro app. Ex.: <code>15/09/2026 a 20/09/2026</code>, <code>15/09/2026 5</code> (5 dias) ou só <code>15/09</code>.</p>
     <textarea id="hist" rows="6" placeholder="15/08/2026 5&#10;12/09/2026 a 17/09/2026&#10;10/10"></textarea><div style="height:8px"></div>
     <button class="btn alt" data-act="hist">Importar datas</button><p class="note" id="histmsg"></p></div>
-  <div class="card"><h2>Dados</h2><p class="mute small">Tudo fica só neste aparelho. Faça backup de vez em quando.</p>
+  <div class="card"><h2>Dados</h2><p class="note">Tudo fica só neste aparelho. Faça backup de vez em quando.</p>
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>`;
@@ -880,10 +878,17 @@ function updateNav() {
   if (gest) gest.hidden = g !== 'pregnant';
   if (g === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal;
 }
+const MORE = [];
+const more = (title, html, sub = '', ic = '') => { MORE.push([title, html]); return `<button class="morerow" data-act="more" data-i="${MORE.length - 1}">${ic ? `<span class="mic">${ic}</span>` : ''}<span class="mt">${title}${sub ? `<small>${sub}</small>` : ''}</span><i>›</i></button>`; };
+function foldNotes(root) {
+  root.querySelectorAll('p.note').forEach(p => { MORE.push(['Saiba mais', `<p>${p.innerHTML}</p>`]); const b = document.createElement('button'); b.className = 'nbtn'; b.dataset.act = 'more'; b.dataset.i = MORE.length - 1; b.textContent = 'ⓘ Saiba mais'; p.replaceWith(b); });
+}
 function render() {
+  MORE.length = 0;
   if (view === 'eng' && goalOf() !== 'conceive') view = 'hoje';
   $main.innerHTML = { hoje: vHoje, cal: vCal, eng: vEng, gest: vGest, ana: vAna, cfg: vCfg, guia: vGuia }[view]();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view));
+  foldNotes($main);
   updateNav();
   if (view === 'gest') mount3d();
 }
@@ -1083,7 +1088,7 @@ function pregBanner() {
   if (!g) return '';
   return `<div class="card" style="background:var(--green-l)"><div class="row" style="border:0"><span><b>🤰 Gestação: ${g.sem}s ${g.d}d</b><br><span class="mute small">${g.tri} · parto previsto ${fmt(g.dpp)}</span></span><button class="chip" data-go="gest">Ver</button></div></div>`;
 }
-const chk = (k, label) => `<button class="chk ${S.settings.checklist[k] ? 'on' : ''}" data-act="chk" data-k="${k}"><span class="bx">${S.settings.checklist[k] ? "✓" : ""}</span><span>${label}</span></button>`;
+const chk = (k, label, act = 'chk') => `<button class="chk ${S.settings.checklist[k] ? 'on' : ''}" data-act="${act}" data-k="${k}"><span class="bx">${S.settings.checklist[k] ? "✓" : ""}</span><span>${label}</span></button>`;
 
 const SIZES = {4:[.1,0],5:[.2,0],6:[.6,0],7:[1,1],8:[1.6,1],9:[2.3,2],10:[3.1,4],11:[4.1,7],12:[5.4,14],13:[7.4,23],14:[8.7,43],15:[10.1,70],16:[11.6,100],17:[13,140],18:[14.2,190],19:[15.3,240],20:[25.6,300],21:[26.7,360],22:[27.8,430],23:[28.9,500],24:[30,600],25:[34.6,660],26:[35.6,760],27:[36.6,875],28:[37.6,1005],29:[38.6,1150],30:[39.9,1320],31:[41.1,1500],32:[42.4,1700],33:[43.7,1920],34:[45,2150],35:[46.2,2380],36:[47.4,2620],37:[48.6,2860],38:[49.8,3080],39:[50.7,3290],40:[51.2,3460]};
 const fmtSize = w => { const [cm, g] = SIZES[w]; return `${String(cm).replace('.', ',')} cm${g ? ` · ${g >= 1000 ? (g / 1000).toFixed(2).replace('.', ',') + ' kg' : g + ' g'}` : ''}`; };
@@ -1202,7 +1207,7 @@ function weekCards(w) {
   const done = MILES.filter(m => m[0] <= wk).slice(-4), next = MILES.find(m => m[0] > wk);
   return `<div class="card"><h2>Tamanho do bebê · semana ${wk}</h2><div class="szrow"><div class="emo">${it[1]}</div><div><div class="big cap">${it[0].replace(/^(um|uma) /, '')}</div><div class="mute">${fmtSize(wk)}</div></div></div>
     <div class="ruler"><i style="width:max(${(cm / 51.2 * 100).toFixed(1)}%,8px)"></i></div><div class="mute small" style="display:flex;justify-content:space-between"><span>agora</span><span>no parto ≈ 51 cm · 3,4 kg</span></div></div>
-  <div class="card"><h2>Desenvolvimento</h2>${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('') || '<p class="mute">O desenvolvimento começa agora.</p>'}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p></div>`;
+  <div class="list">${more('Desenvolvimento do bebê', `${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('')}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p>`, next ? `próximo marco: ${next[0]}ª semana` : '', '🌱')}</div>`;
 }
 
 function vGest() {
@@ -1228,7 +1233,7 @@ function vGest() {
   const cards = DAILY.map(([k, t, c, e]) => `<button class="dc" style="background:${c}" data-act="info" data-k="${k}"><b>${t}</b><span>${e}</span></button>`).join('');
   const exams = EXAMS.map(([a, b, t], i) => {
     const st = g.sem > b ? 'past' : g.sem >= a ? 'now' : 'next';
-    return `<div class="exam ${st}">${chk('x' + i, `<span class="pill ${st === 'now' ? 'p-fertil' : 'p-folicular'}" style="margin-right:6px">${a}–${b}s</span>${t}`)}</div>`;
+    return `<div class="exam ${st}">${chk('x' + i, `<span class="pill ${st === 'now' ? 'p-fertil' : 'p-folicular'}" style="margin-right:6px">${a}–${b}s</span>${t}`, 'chkx')}</div>`;
   }).join('');
   return `<section class="gest-hero">
     <div class="gh-top"><span>${fmt(TODAY, { day: 'numeric', month: 'long' })}</span></div>
@@ -1247,9 +1252,8 @@ function vGest() {
       <button data-act="info" data-k="food"><span>🥗</span><b>Alimentação</b><small>Nutrientes</small></button>
     </div></div>
   <div class="card"><h2>Parto previsto</h2><div class="bar"><div style="width:${Math.min(g.dias / 280, 1) * 100}%"></div></div><p class="mute" style="margin:0"><b>${fmt(g.dpp, { day: 'numeric', month: 'long', year: 'numeric' })}</b> · faltam ${Math.max(g.left, 0)} dias</p></div>
-  <div class="card"><h2>Exames e consultas</h2>${exams}<p class="note">Roteiro geral do pré-natal. Siga sempre as orientações do seu médico. Com ciclo irregular, confirme a data pelo ultrassom do 1º trimestre.</p></div>
-  <button class="btn" data-act="log" data-d="${TODAY}">Registrar sintomas de hoje</button><div style="height:8px"></div>
-  <button class="btn danger" data-act="endpreg">Encerrar acompanhamento</button>`;
+  <div class="list">${more('Exames e consultas', `${exams}<p class="note">Roteiro geral do pré-natal. Siga sempre as orientações do seu médico. Com ciclo irregular, confirme a data pelo ultrassom do 1º trimestre.</p>`, 'pré-natal', '📋')}</div>
+  <button class="btn" data-act="log" data-d="${TODAY}">Registrar sintomas de hoje</button>`;
 }
 
 // ---------- engravidar ----------
@@ -1280,8 +1284,8 @@ function vEng() {
   const color = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
   return `<h1>Plano para engravidar 🌱</h1>
   ${planHeader(A)}
-  <div class="card hero"><div class="mute">Chance de gravidez hoje</div><div style="font-size:36px;font-weight:800;color:${color}">${f ? f.level : '—'}</div><p class="mute">${f ? f.txt : ''}.</p>
-    ${beyond ? (pc?.hasNeg ? `<p class="mute">Teste negativo em ${fmt(pc.lastNeg)}. ${pc.line}</p>` : `<p style="color:var(--pink);font-weight:700">Ciclo fora do seu padrão — faça um teste de gravidez.</p>`) + `<button class="btn alt" data-go="gest">Positivo? Iniciar acompanhamento</button>` : ''}</div>
+  <div class="card hero"><div class="mute">Chance de gravidez hoje</div><div style="font-size:36px;font-weight:800;color:${color}">${f ? f.level : '—'}</div>${f ? `<p class="note">${f.txt}.</p>` : ''}
+    ${beyond ? (pc?.hasNeg ? `<div class="list" style="margin-top:8px">${more(`Teste negativo em ${sd(pc.lastNeg)}`, `<p>${pc.line}</p>`, 'o que isso significa', '🧾')}</div>` : `<p style="color:var(--pink);font-weight:700">Faça um teste de gravidez.</p>`) + `<button class="btn alt" data-go="gest">Positivo? Iniciar acompanhamento</button>` : ''}</div>
   <div class="card"><h2>Plano deste ciclo</h2>${plan}</div>
   ${f?.ov ? `<div class="card"><h2>Este ciclo</h2><div class="row"><span>Relações na janela fértil</span><b>${tries}</b></div></div>` : ''}
   <button class="btn" data-act="log" data-d="${TODAY}">Registrar hoje (muco, LH, relação…)</button>
@@ -1446,6 +1450,8 @@ document.addEventListener('click', e => {
       if (!on && !S.settings.conceiveSince) S.settings.conceiveSince = TODAY;
       view = 'hoje'; save(); render(); scrollTo(0, 0); break;
     }
+    case 'more': { const m = MORE[+t.dataset.i]; if (m) dialog(`<h2 style="margin:0 0 8px">${m[0]}</h2>${m[1]}`); break; }
+    case 'chkx': { const k = t.dataset.k; S.settings.checklist[k] = !S.settings.checklist[k]; save(); t.classList.toggle('on', !!S.settings.checklist[k]); t.querySelector('.bx').textContent = S.settings.checklist[k] ? '✓' : ''; break; }
     case 'testdlg': testDialog(t.dataset.k || 'preg', t.dataset.d || TODAY); break;
     case 'tdk': { TD.kind = t.dataset.v; document.querySelectorAll('[data-act="tdk"]').forEach(b => b.classList.toggle('on', b === t)); break; }
     case 'tdsave': saveTest(t.dataset.v); break;
@@ -1514,7 +1520,7 @@ document.addEventListener('input', e => {
   b3.dataset.w = Math.min(Math.max(gv, 4), 40);
   document.getElementById('gh-text').innerHTML = heroText(gv, g);
   if (b3.querySelector('canvas')) { clearTimeout(t3); t3 = setTimeout(mount3d, 60); } else b3.innerHTML = fetusSvg(gv);
-  document.getElementById('wk-cards').innerHTML = weekCards(gv); symInfo(gv);
+  document.getElementById('wk-cards').innerHTML = weekCards(gv); foldNotes(document.getElementById('wk-cards')); symInfo(gv);
 });
 document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute?.('role') === 'button') { e.preventDefault(); e.target.click(); } });
 $sheet.addEventListener('click', e => { if (e.target === $sheet && !$sheet.classList.contains('full')) $sheet.close(); });
