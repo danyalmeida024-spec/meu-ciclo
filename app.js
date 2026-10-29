@@ -712,11 +712,10 @@ function vHoje() {
     h_alert: ['Atraso', pc?.hasNeg ? `<p>Teste negativo em <b>${fmt(pc.lastNeg)}</b> (${diff(TODAY, pc.lastNeg)} dias atrás). Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>${pc.line}</p><p>Causas comuns: ovulação tardia, estresse, tireoide ou SOP. Sem menstruar até ${fmt(add(last.start, 90))} (3 meses), ou com dor forte/sangramento intenso, procure seu ginecologista.</p>` : `<p>Ciclo ${over} dia(s) além da faixa habitual (${A.lo}–${A.hi}).</p><p>Pode ser ovulação tardia, estresse, SOP ou tireoide, mas <b>gravidez é uma possibilidade</b>. Faça um teste (primeira urina do dia) e registre o resultado. Sem menstruar por 3 meses, procure seu ginecologista.</p>`]
   };
   const banner = beyond && !S.settings.pregnancy ? `<button class="banner" data-act="info" data-k="h_alert"><span>${pc?.hasNeg ? `Teste negativo em ${sd(pc.lastNeg)}` : 'Faça um teste de gravidez'}</span><b>Ver ›</b></button>` : '';
-  const pos = Object.entries(S.logs).filter(([d, l]) => l.test === 'Positivo' && diff(TODAY, d) <= 14).length && !S.settings.pregnancy ? `<div class="banner ok"><span>Teste positivo registrado</span><button class="chip" data-go="gest">Acompanhar gestação</button></div>` : '';
   const dk = isDark();
   return `<div class="toprow"><h1 class="cap">${fmt(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <button class="sw" data-act="theme" role="switch" aria-checked="${dk}" aria-label="Modo noturno"><span>Noturno</span><span class="tr"><i><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span></button></div>
-  ${modeSwitch()}${pregBanner()}${pos}${banner}
+  ${modeSwitch()}${pregBanner()}${banner}
   <section class="hh st-${st}">
     <button class="prec" data-act="info" data-k="h_prec" aria-label="Precisão da previsão">Precisão <span class="dots">${'●'.repeat(prec)}${'○'.repeat(3 - prec)}</span></button>
     <div class="hhb" role="button" tabindex="0" data-act="phase" data-k="${st}" aria-label="Entender esta fase"><div class="hr"><div class="ring2"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#ffffff40" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 50 50)"/></svg><div><small>dia</small><b>${day}</b></div></div>
@@ -853,7 +852,7 @@ function vAna() {
 function vCfg() {
   const s = S.settings;
   return `<h1>Ajustes</h1>
-  ${S.settings.pregnancy ? '' : '<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Já está grávida? Acompanhe semana a semana.</p><button class="btn alt" data-act="startgest">Acompanhar gestação</button></div>'}
+  ${(() => { const g = pregInfo(); return g ? `<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Em acompanhamento: ${g.sem}s ${g.d}d · parto previsto ${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</p><button class="btn alt" data-go="gest">Abrir gestação</button><div style="height:8px"></div><button class="btn alt" data-act="editdum">Ajustar data</button><div style="height:8px"></div><button class="btn danger" data-act="endpreg">Sair do modo gestação</button></div>` : '<div class="card"><h2>Gestação</h2><p class="mute small" style="margin:0 0 10px">Teve teste positivo ou já está grávida? Ative o acompanhamento semana a semana.</p><button class="btn alt" data-act="startgest">Acompanhar gestação</button></div>'; })()}
   <div class="card"><h2>Valores iniciais</h2><p class="mute small">Usados até o app ter histórico suficiente.</p>
     <div class="two"><div><label class="f">Ciclo (dias)</label><input type="number" min="21" max="45" data-set="cycle" value="${s.cycle}"></div><div><label class="f">Menstruação (dias)</label><input type="number" min="2" max="10" data-set="period" value="${s.period}"></div></div>
     <label class="f">Fase lútea (dias)</label><input type="number" min="10" max="16" data-set="luteal" value="${s.luteal}"></div>
