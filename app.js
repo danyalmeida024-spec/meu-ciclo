@@ -1083,7 +1083,7 @@ const FOOD = {
   3: 'Fracione as refeições para aliviar a azia, mantenha ferro e cálcio, hidrate-se bem e reduza o sal se houver inchaço importante.'
 };
 const DAILY = [
-  ['sint', 'Sintomas comuns', '#8fbfe6', '🤢', 'Enjoo, cansaço, seios sensíveis, vontade de urinar com frequência, aversão a cheiros, oscilação de humor e cólicas leves são comuns no início.<br><br><b>Procure atendimento</b> se tiver sangramento, dor forte ou de um lado só, febre ou vômitos que impedem de comer e beber.'],
+  ['sint', 'Sintomas da semana', '#8fbfe6', '🤢', 'Enjoo, cansaço, seios sensíveis, vontade de urinar com frequência, aversão a cheiros, oscilação de humor e cólicas leves são comuns no início.<br><br><b>Procure atendimento</b> se tiver sangramento, dor forte ou de um lado só, febre ou vômitos que impedem de comer e beber.'],
   ['naus', 'Náuseas: o que ajuda', '#e99a63', '🍋', '• Biscoito de água e sal antes de levantar<br>• Refeições pequenas, a cada 2–3 horas<br>• Gengibre, líquidos gelados em goles<br>• Evite jejum longo e cheiros que incomodam<br>• Vitamina B6 ou remédios para enjoo só com orientação médica<br><br>Vômitos o dia todo, perda de peso ou desidratação: procure seu médico (pode ser hiperêmese).'],
   ['cons', 'Guia da primeira consulta', '#12706b', '📋', '<b>Leve:</b> data da última menstruação e o histórico de ciclos (este app mostra), remédios e suplementos em uso, exames e vacinas anteriores, histórico familiar.<br><br><b>Pergunte:</b> ultrassom para datar a gestação, quais exames fazer, dose de ácido fólico, atividade física, viagens e o que evitar.<br><br>Com ciclo irregular, peça o ultrassom precoce para confirmar a data provável do parto.'],
   ['nutr', 'Nutrientes indispensáveis', '#4f5675', '🥬', 'Ácido fólico (formação do tubo neural), ferro (anemia), cálcio, vitamina D, iodo e ômega-3/DHA.<br><br>Prefira alimentos variados; suplementos só conforme prescrição. Evite álcool, peixes com muito mercúrio, carnes e ovos crus e queijos não pasteurizados.'],
@@ -1124,6 +1124,11 @@ const SYMP = [
 ];
 const sympFor = w => SYMP.filter(([a, b]) => w >= a && w <= b);
 const ALERT_G = w => ['Sangramento vaginal ou perda de líquido', 'Dor forte ou constante na barriga', 'Febre, ou dor ao urinar', w >= 20 ? 'Dor de cabeça forte com visão embaçada ou inchaço súbito no rosto e mãos (pode ser pré-eclâmpsia)' : 'Vômitos que não deixam beber nem comer nada', ...(w >= 28 ? ['Bebê bem menos ativo que o habitual'] : []), ...(w < 37 && w >= 20 ? ['Contrações regulares antes das 37 semanas'] : [])];
+function symInfo(w) {
+  w = Math.min(Math.max(w, 4), 40);
+  INFO.sint = [`Sintomas · ${w}ª semana`, `<p class="mute small" style="margin:0 0 6px">${triPos(w)}</p>${sympFor(w).map(([, , t, why]) => `<p class="sy"><b>${t}</b><span>${why}</span></p>`).join('')}<p class="note">Nem toda gestante sente tudo isso, e a falta de sintomas também é normal. Os sintomas comuns da semana aparecem destacados no seu registro diário.</p>`];
+  INFO.alert = [`Sinais de alerta · ${w}ª semana`, `<div class="alertbox" style="margin:0"><b>Procure atendimento se tiver</b><ul>${ALERT_G(w).map(x => `<li>${x}</li>`).join('')}</ul></div><p class="note">Informação geral, não substitui orientação médica.</p>`];
+}
 const MILES = [[5,'O tubo neural (futura medula e cérebro) se fecha e o coração começa a se formar'],[6,'O coração já bate (cerca de 110 bpm) e aparece no ultrassom; surgem os brotos de braços e pernas'],[7,'As mãos surgem como pequenas "pás"; formam-se fígado e intestino'],[8,'Os dedos das mãos se separam, pálpebras e orelhas se formam e a cauda desaparece'],[9,'Todos os órgãos principais já estão formados; começam os dedos dos pés'],[10,'Fim da fase embrionária — agora é um feto. Começam unhas e ossos; os rins produzem urina'],[11,'Os genitais começam a se diferenciar; as mãos abrem e fecham'],[12,'Surgem os reflexos e o intestino se acomoda dentro do abdome'],[13,'Formam-se as impressões digitais e as cordas vocais'],[14,'O pescoço se define e o bebê engole líquido amniótico'],[16,'Os movimentos ficam vigorosos (você ainda pode não sentir)'],[18,'A audição se desenvolve; os primeiros movimentos costumam ser sentidos entre 18 e 22 semanas'],[20,'Cobertura de vérnix e lanugo; o sexo costuma ser visível ao ultrassom'],[22,'Sobrancelhas e pálpebras ficam definidas'],[24,'Os pulmões começam a produzir surfactante; com UTI neonatal já pode sobreviver fora do útero'],[26,'Os olhos começam a abrir'],[28,'Ciclos de sono e vigília; ele pisca'],[30,'A medula óssea assume a produção de células do sangue'],[32,'Unhas completas; a maioria já está de cabeça para baixo'],[34,'Pulmões quase maduros; a gordura sob a pele aumenta'],[36,'Preparando-se para nascer; a cabeça começa a encaixar na pelve'],[37,'Considerado a termo precoce'],[39,'A termo completo'],[40,'Data provável do parto']];
 let gv = null;
 
@@ -1182,8 +1187,7 @@ function weekCards(w) {
   const done = MILES.filter(m => m[0] <= wk).slice(-4), next = MILES.find(m => m[0] > wk);
   return `<div class="card"><h2>Tamanho do bebê · semana ${wk}</h2><div class="szrow"><div class="emo">${it[1]}</div><div><div class="big cap">${it[0].replace(/^(um|uma) /, '')}</div><div class="mute">${fmtSize(wk)}</div></div></div>
     <div class="ruler"><i style="width:max(${(cm / 51.2 * 100).toFixed(1)}%,8px)"></i></div><div class="mute small" style="display:flex;justify-content:space-between"><span>agora</span><span>no parto ≈ 51 cm · 3,4 kg</span></div></div>
-  <div class="card"><h2>Desenvolvimento</h2>${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('') || '<p class="mute">O desenvolvimento começa agora.</p>'}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p></div>
-  <div class="card"><h2>Sintomas comuns · ${wk}ª semana</h2><p class="mute small" style="margin:0 0 8px">${triPos(wk)}</p>${sympFor(wk).map(([, , t, why]) => `<p class="sy"><b>${t}</b><span>${why}</span></p>`).join('')}<div class="alertbox"><b>Procure atendimento se tiver</b><ul>${ALERT_G(wk).map(x => `<li>${x}</li>`).join('')}</ul></div><p class="note">Nem toda gestante sente tudo isso, e a falta de sintomas também é normal. Em caso de dúvida, fale com seu obstetra.</p></div>`;
+  <div class="card"><h2>Desenvolvimento</h2>${done.map(m => `<p class="ms done"><b>✓ ${m[0]}ª sem.</b> ${m[1]}</p>`).join('') || '<p class="mute">O desenvolvimento começa agora.</p>'}${next ? `<p class="ms"><b>Próximo · ${next[0]}ª sem.</b> ${next[1]}</p>` : ''}<p class="note">Ilustração e marcos aproximados; cada bebê tem seu ritmo.</p></div>`;
 }
 
 function vGest() {
@@ -1205,6 +1209,7 @@ function vGest() {
     food: ['Alimentação', `<p>${FOOD[tn]}</p><p class="note">Suplementos e doses: apenas conforme prescrição médica.</p>`]
   };
   DAILY.forEach(([k, t, , , h]) => INFO[k] = [t, `<p>${h}</p><p class="note">Informação geral, não substitui orientação médica.</p>`]);
+  symInfo(gv ?? g.sem);
   const cards = DAILY.map(([k, t, c, e]) => `<button class="dc" style="background:${c}" data-act="info" data-k="${k}"><b>${t}</b><span>${e}</span></button>`).join('');
   const exams = EXAMS.map(([a, b, t], i) => {
     const st = g.sem > b ? 'past' : g.sem >= a ? 'now' : 'next';
@@ -1494,7 +1499,7 @@ document.addEventListener('input', e => {
   b3.dataset.w = Math.min(Math.max(gv, 4), 40);
   document.getElementById('gh-text').innerHTML = heroText(gv, g);
   if (b3.querySelector('canvas')) { clearTimeout(t3); t3 = setTimeout(mount3d, 60); } else b3.innerHTML = fetusSvg(gv);
-  document.getElementById('wk-cards').innerHTML = weekCards(gv);
+  document.getElementById('wk-cards').innerHTML = weekCards(gv); symInfo(gv);
 });
 document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute?.('role') === 'button') { e.preventDefault(); e.target.click(); } });
 $sheet.addEventListener('click', e => { if (e.target === $sheet && !$sheet.classList.contains('full')) $sheet.close(); });
