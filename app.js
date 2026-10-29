@@ -398,13 +398,14 @@ function nextStep(A, c, pc) {
     case 'before': return TODAY >= lhDate ? { ic: '🧪', t: 'Faça o teste de LH hoje', s: `Ovulação estimada em ${sd(c.ov)}`, cta: 'Registrar teste' } : { ic: '📅', t: `Teste de LH a partir de ${sd(lhDate)}`, s: `Janela fértil em ${diff(c.win[0], TODAY)} dias`, cta: null };
     case 'mens': return { ic: '🩸', t: 'Registre o fluxo', s: `Dia ${day} · ${folic ? 'ácido fólico de hoje ✓' : 'não esqueça do ácido fólico'}`, cta: 'Registrar' };
     case 'wait': return tdays <= 0 ? { ic: '🧾', t: 'Faça o teste de gravidez', s: 'Primeira urina do dia. Já é confiável', cta: 'Registrar teste' } : { ic: '⏳', t: `Espere ${tdays} dia${tdays > 1 ? 's' : ''} para testar`, s: `Teste a partir de ${sd(c.testDate)}: antes pode dar falso negativo`, cta: null };
-    case 'late': return { ic: '🧾', t: 'Faça o teste de gravidez', s: pc?.hasNeg ? `Último negativo em ${sd(pc.lastNeg)}` : 'Primeira urina do dia', cta: 'Registrar teste' };
+    case 'late': if (pc?.hasNeg && diff(TODAY, pc.lastNeg) < 3) return { ic: '⏳', t: `Repita o teste em ${3 - diff(TODAY, pc.lastNeg)} dia${3 - diff(TODAY, pc.lastNeg) > 1 ? 's' : ''}`, s: `Negativo em ${sd(pc.lastNeg)}. Se a menstruação não vier, teste de novo`, cta: 'Registrar teste' };
+      return { ic: '🧾', t: 'Faça o teste de gravidez', s: pc?.hasNeg ? `Último negativo em ${sd(pc.lastNeg)}` : 'Primeira urina do dia', cta: 'Registrar teste' };
     default: return { ic: '🧪', t: 'Faça o teste de LH', s: 'Ele mostra quando você ovula', cta: 'Registrar teste' };
   }
 }
 function nextStepCard(A, c, pc) {
   const n = nextStep(A, c, pc);
-  return `<div class="nstep"><span class="nsi">${n.ic}</span><span class="nst"><small>Próximo passo</small><b>${n.t}</b><em>${n.s}</em></span>${n.cta ? `<button class="chip on" data-act="log" data-d="${TODAY}">${n.cta}</button>` : ''}</div>`;
+  return `<div class="nstep"><span class="nsi">${n.ic}</span><span class="nst"><small>Próximo passo</small><b>${n.t}</b><em>${n.s}</em></span>${n.cta ? `<button class="chip on" data-act="${/teste/i.test(n.cta) ? 'testdlg' : 'log'}" data-k="${/LH/.test(n.t) ? 'lh' : 'preg'}" data-d="${TODAY}">${n.cta}</button>` : ''}</div>`;
 }
 function tryDaysCard(c) {
   if (!c.win || c.st === 'late' || TODAY > add(c.win[1], 2)) return '';
@@ -1083,7 +1084,7 @@ function vGest() {
   const dow = D(TODAY).getDay(), wstart = add(TODAY, -dow);
   const strip = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((n, i) => { const d = add(wstart, i), L = S.logs[d] || {}; return `<button class="wd ${d === TODAY ? 'now' : ''}" data-act="log" data-d="${d}"><small>${d === TODAY ? 'HOJE' : n}</small><b>${D(d).getDate()}</b><i>${L.sex && L.sex !== 'Não' ? '♥' : ''}</i></button>`; }).join('');
   INFO = {
-    det: ['Detalhes', `<div class="stats"><div><div class="mute small">Idade gestacional</div><div class="big">${g.sem}s ${g.d}d</div></div><div><div class="mute small">Trimestre</div><div class="big">${tn}º</div></div><div><div class="mute small">Parto previsto</div><div class="big" style="font-size:16px">${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div><div><div class="mute small">Faltam</div><div class="big">${Math.max(g.left, 0)} dias</div></div><div><div class="mute small">Tamanho do bebê</div><div class="big" style="font-size:16px">${fmtSize(wk)}</div></div><div><div class="mute small">Compara-se a</div><div class="big" style="font-size:16px">${ITEM[wk][0]}</div></div></div><p class="note">DUM considerada: ${fmt(g.dum, { day: 'numeric', month: 'long', year: 'numeric' })}. Medidas aproximadas (comprimento até a 19ª semana: cabeça–nádega; depois, cabeça–pés). Com ciclo irregular, confirme a data pelo ultrassom do 1º trimestre.</p>`],
+    det: ['Detalhes', `<div class="stats"><div><div class="mute small">Idade gestacional</div><div class="big">${g.sem}s ${g.d}d</div></div><div><div class="mute small">Trimestre</div><div class="big">${tn}º</div></div><div><div class="mute small">Parto previsto</div><div class="big" style="font-size:16px">${fmt(g.dpp, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div><div><div class="mute small">Faltam</div><div class="big">${Math.max(g.left, 0)} dias</div></div><div><div class="mute small">Tamanho do bebê</div><div class="big" style="font-size:16px">${fmtSize(wk)}</div></div><div><div class="mute small">Compara-se a</div><div class="big" style="font-size:16px">${ITEM[wk][0]}</div></div></div><p class="note">DUM considerada: ${fmt(g.dum, { day: 'numeric', month: 'long', year: 'numeric' })}. Medidas aproximadas (comprimento até a 19ª semana: cabeça–nádega; depois, cabeça–pés). Com ciclo irregular, confirme a data pelo ultrassom do 1º trimestre.</p><button class="chip" data-act="editdum">Ajustar data</button>`],
     baby: ['Bebê · ' + g.sem + ' semanas', `<p class="big" style="margin:0 0 6px">${fmtSize(wk)}</p><p>Do tamanho de <b>${ITEM[wk][0]}</b> ${ITEM[wk][1]}.</p><p>${info[1]}</p><p class="note">Tamanhos são médias aproximadas.</p>`],
     body: ['Seu corpo', `<p>${BODY[tn]}</p><p class="note">Cada gestação é diferente. Qualquer sintoma que preocupe, converse com seu médico.</p>`],
     food: ['Alimentação', `<p>${FOOD[tn]}</p><p class="note">Suplementos e doses: apenas conforme prescrição médica.</p>`]
@@ -1212,6 +1213,35 @@ function importHist(text) {
 // ---------- eventos ----------
 const $main = document.getElementById('main'), $sheet = document.getElementById('sheet');
 let pending = null;
+const TD = { kind: 'preg' };
+const nowHM = () => { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); };
+function testDialog(kind, date) {
+  TD.kind = kind;
+  dialog(`<h2 style="margin:0 0 10px">Registrar teste</h2>
+    <div class="chips"><button class="chip ${kind === 'preg' ? 'on' : ''}" data-act="tdk" data-v="preg">🧾 Gravidez</button><button class="chip ${kind === 'lh' ? 'on' : ''}" data-act="tdk" data-v="lh">🧪 Ovulação (LH)</button></div>
+    <div style="display:flex;gap:10px;margin-top:12px"><div style="flex:1"><label class="f">Data</label><input type="date" id="tdd" value="${date}" max="${TODAY}"></div><div style="flex:1"><label class="f">Hora</label><input type="time" id="tdt" value="${nowHM()}"></div></div>
+    <p class="mute small" style="margin:12px 0 8px">Resultado</p>
+    <div style="display:flex;gap:10px"><button class="btn alt" style="flex:1" data-act="tdsave" data-v="Negativo">➖ Negativo</button><button class="btn" style="flex:1" data-act="tdsave" data-v="Positivo">➕ Positivo</button></div>`);
+}
+function saveTest(res) {
+  const d = document.getElementById('tdd').value || TODAY, tm = document.getElementById('tdt').value || nowHM(), kind = TD.kind;
+  const L = S.logs[d] = S.logs[d] || {};
+  if (kind === 'lh') { L.lh = res; L.lhAt = tm; } else { L.test = res; L.testAt = tm; }
+  save();
+  if (kind === 'preg' && res === 'Positivo' && !S.settings.pregnancy) {
+    const A = analyze(), last = A.g.at(-1), ov = last ? detectOv(last.start, d) : null;
+    const dum = ov ? add(ov, -14) : (last ? last.start : add(d, -28));
+    S.settings.pregnancy = { dum }; S.settings.goal = 'track'; view = 'gest'; save(); render(); scrollTo(0, 0);
+    dialog(`<h2 style="margin:0 0 8px">Parabéns! 💜</h2><p>Teste positivo registrado em ${sd(d)} às ${tm}. Passei o app para o acompanhamento da gestação.</p><p class="mute small">Contei as semanas a partir de ${fmt(dum, { day: 'numeric', month: 'long' })} (${ov ? 'ovulação estimada − 14 dias' : 'início da última menstruação'}). Com ciclo irregular isso pode variar: confirme com beta-hCG e ultrassom, e ajuste a data na aba Gestação.</p>`);
+    return;
+  }
+  render();
+  let msg;
+  if (kind === 'lh') msg = res === 'Positivo' ? `<p>LH positivo: a ovulação costuma ocorrer em 24–36 h. Esses são seus melhores dias para tentar.</p>` : `<p>LH negativo registrado. O app usa isso para refinar a previsão de ovulação: ainda sem pico hoje.</p>`;
+  else if (res === 'Positivo') msg = `<p>Positivo registrado em ${sd(d)} às ${tm}.</p>`;
+  else { const pc = pregCheck(analyze()); msg = `<p>Negativo registrado em ${sd(d)} às ${tm}.</p>${pc?.hasNeg ? `<p>${pc.line}</p>` : ''}<p class="mute small">A chance deste ciclo foi recalculada com esse teste. Se a menstruação não vier, repita em 3–5 dias com a primeira urina.</p>`; }
+  dialog(`<h2 style="margin:0 0 8px">Teste registrado</h2>${msg}`);
+}
 function dialog(html) { $sheet.className = ''; $sheet.innerHTML = html + '<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>'; if (!$sheet.open) $sheet.showModal(); }
 const notify = msg => dialog(`<p style="font-size:17px">${msg}</p>`);
 function ask(msg, yes, fn) { pending = fn; $sheet.className = ''; $sheet.innerHTML = `<p style="font-size:17px">${msg}</p><button class="btn" data-act="yes">${yes}</button><div style="height:8px"></div><button class="btn alt" data-act="close">Cancelar</button>`; if (!$sheet.open) $sheet.showModal(); }
@@ -1224,7 +1254,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-act]'); if (!t) return;
   if (t.dataset.go) { view = t.dataset.go; gv = null; render(); scrollTo(0, 0); return; }
   if (t.dataset.tab) { view = t.dataset.tab; gv = null; render(); scrollTo(0, 0); return; }
-  const chip = t.closest('.chip') && t;
+  const chip = t.closest('.chip') && !t.dataset.act && t;
   if (chip) {
     const wrap = chip.parentElement;
     if (wrap.dataset.multi === '1') chip.classList.toggle('on');
@@ -1280,6 +1310,14 @@ document.addEventListener('click', e => {
       if (!on && !S.settings.conceiveSince) S.settings.conceiveSince = TODAY;
       view = 'hoje'; save(); render(); scrollTo(0, 0); break;
     }
+    case 'testdlg': testDialog(t.dataset.k || 'preg', t.dataset.d || TODAY); break;
+    case 'tdk': { TD.kind = t.dataset.v; document.querySelectorAll('[data-act="tdk"]').forEach(b => b.classList.toggle('on', b === t)); break; }
+    case 'tdsave': saveTest(t.dataset.v); break;
+    case 'editdum': {
+      const g = pregInfo(); if (!g) break;
+      dialog(`<h2 style="margin:0 0 8px">Ajustar data da gestação</h2><p class="mute small">Data de início usada para contar as semanas (equivale à DUM). Se tiver ultrassom, use a DPP do médico.</p><label class="f">DUM</label><input type="date" id="dum2" value="${g.dum}" max="${TODAY}"><div style="height:12px"></div><button class="btn" data-act="savedum">Salvar</button>`); break;
+    }
+    case 'savedum': { const v = document.getElementById('dum2').value; if (v) { S.settings.pregnancy = { ...S.settings.pregnancy, dum: v }; save(); $sheet.close(); render(); } break; }
     case 'startgest': view = 'gest'; render(); scrollTo(0, 0); break;
     case 'phase': {
       const [title, html] = phaseSheet(analyze(), t.dataset.k);
