@@ -11,7 +11,12 @@ applyTheme();
 // ---------- estado ----------
 const KEY = 'ciclo.v1';
 const DEF = { logs: {}, settings: { cycle: 28, period: 5, luteal: 14, pregnancy: null, checklist: {}, goal: 'track', conceiveSince: null } };
-const norm = x => ({ logs: x.logs || {}, settings: { ...DEF.settings, ...x.settings }, savedAt: x.savedAt || 0 });
+const norm = x => {
+  const o = { logs: x.logs || {}, settings: { ...DEF.settings, ...x.settings }, savedAt: x.savedAt || 0 };
+  // gestação sem data de início (versões antigas): o passado nunca é reclassificado
+  if (o.settings.pregnancy && !o.settings.pregnancy.since) o.settings.pregnancy = { ...o.settings.pregnancy, since: new Date().toLocaleDateString('sv') };
+  return o;
+};
 let S = load();
 function load() {
   try { const x = JSON.parse(localStorage.getItem(KEY)); return norm(x || {}); } catch { return norm({}); }
@@ -742,7 +747,7 @@ function vCal() {
     const s = iso(new Date(cal.y, cal.m, d, 12));
     const L = S.logs[s] || {};
     const inPg = pg && s >= since && s <= add(pg.dpp, 14), pgd = inPg ? diff(s, pg.dum) : 0;
-    const c = ['d', inPg ? 'pg' + (s === pg.dpp ? ' dpp' : '') + (s === ci.ov ? ' conc' : '') : '', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
+    const c = ['d', inPg && !K.per.has(s) ? 'pg' + (s === pg.dpp ? ' dpp' : '') + (s === ci.ov ? ' conc' : '') : '', K.per.has(s) ? 'per' : K.late.has(s) ? 'late' : K.pper.has(s) ? 'pper' : K.pper2.has(s) ? 'pper2' : K.fert.has(s) ? 'fert' : '', K.ov.has(s) ? 'ov' : '', best.has(s) ? 'best' : '', s === TODAY ? 'today' : ''].join(' ');
     const heart = L.sex && L.sex !== 'Não' ? '<b>♥</b>' : '';
     const pillM = (L.meds || []).includes('Anticoncepcional') ? '<u>💊</u>' : '', spotM = L.flow === 'spot' ? '<s></s>' : '';
     const dot = Object.keys(L).some(k => k !== 'flow' && k !== 'sex' && k !== 'meds') ? '<i></i>' : '';
@@ -917,7 +922,12 @@ const DSEC_P = [
   { ...pickSec('notas') }
 ];
 const pregSince = () => S.settings.pregnancy ? (S.settings.pregnancy.since || S.settings.pregnancy.dum) : null;
-const daySecs = () => S.settings.pregnancy && DAY && DAY.date >= pregSince() ? DSEC_P : DSEC;
+const daySecs = () => {
+  if (!(S.settings.pregnancy && DAY && DAY.date >= pregSince())) return DSEC;
+  // dados do ciclo já registrados nesse dia continuam visíveis
+  const extra = DSEC.filter(x => !DSEC_P.some(y => y.id === x.id) && secCount(x) > 0);
+  return [...DSEC_P, ...extra];
+};
 let DAY = null, dayT = 0, toastT = 0;
 const cycleDayOf = date => { const A = analyze(), i = A.g.findLastIndex(x => x.start <= date); return i < 0 ? null : diff(date, A.g[i].start) + 1; };
 const isOn = (g, v) => g.multi ? (DAY.L[g.k] || []).includes(v) : DAY.L[g.k] === v;
@@ -945,7 +955,7 @@ function openDay(date) {
   DAY = { date, L: structuredClone(S.logs[date] || {}) };
   const cd = cycleDayOf(date), title = date === TODAY ? 'Hoje' : fmt(date, { weekday: 'short', day: 'numeric', month: 'short' });
   $sheet.className = 'full';
-  $sheet.innerHTML = `<div class="dh"><button class="ib" data-act="close" aria-label="Fechar">✕</button><div class="dt"><b>${title}</b><small>${daySecs() === DSEC_P ? `${Math.floor(diff(date, S.settings.pregnancy.dum) / 7)}s ${diff(date, S.settings.pregnancy.dum) % 7}d de gestação` : cd ? cd + 'º dia do ciclo' : 'sem ciclo registrado'}</small></div><span class="dnav"><button class="ib" data-act="dprev" aria-label="Dia anterior">‹</button><button class="ib" data-act="dnext" ${date >= TODAY ? 'disabled' : ''} aria-label="Próximo dia">›</button></span></div>
+  $sheet.innerHTML = `<div class="dh"><button class="ib" data-act="close" aria-label="Fechar">✕</button><div class="dt"><b>${title}</b><small>${S.settings.pregnancy && DAY && date >= pregSince() ? `${Math.floor(diff(date, S.settings.pregnancy.dum) / 7)}s ${diff(date, S.settings.pregnancy.dum) % 7}d de gestação` : cd ? cd + 'º dia do ciclo' : 'sem ciclo registrado'}</small></div><span class="dnav"><button class="ib" data-act="dprev" aria-label="Dia anterior">‹</button><button class="ib" data-act="dnext" ${date >= TODAY ? 'disabled' : ''} aria-label="Próximo dia">›</button></span></div>
   <div class="ds"><input id="dq" type="search" placeholder="Buscar sintoma, humor…" autocomplete="off"><div class="jumps">${daySecs().map(x => `<button class="jp" data-act="jump" data-id="${x.id}" style="--c:${x.c}">${x.t}</button>`).join('')}</div></div>
   <div class="dsc" id="dsc">${daySecs().map(dayCard).join('')}<div class="dend"></div></div><div class="toast" id="toast">Salvo ✓</div>`;
   if (!$sheet.open) $sheet.showModal();
