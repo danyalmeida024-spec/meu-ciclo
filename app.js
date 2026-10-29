@@ -386,6 +386,61 @@ function conceiveInfo(A) {
   return { last, day, F, f, e, beyond, ov, src, win, best, testDate, st, tries, ph };
 }
 
+// ---------- modo engravidar: próximo passo, dias para tentar, espera e plano ----------
+const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const sexOn = d => !!S.logs[d]?.sex && S.logs[d].sex !== 'Não';
+function nextStep(A, c, pc) {
+  const L = S.logs[TODAY] || {}, day = c.day, lhDate = add(c.last.start, Math.max(5, (A.n ? A.min : A.lo) - 17) - 1), tdays = diff(c.testDate, TODAY);
+  const folic = (L.meds || []).includes('Ácido fólico');
+  switch (c.st) {
+    case 'best': return { ic: '💞', t: 'Hoje é dia de tentar', s: sexOn(TODAY) ? 'Hoje já registrado ✓ · repita em 1–2 dias' : `Melhores dias até ${sd(c.best[1])}`, cta: 'Registrar relação' };
+    case 'fertile': return { ic: '🌿', t: 'Janela fértil aberta', s: 'Relação a cada 1–2 dias mantém a chance', cta: 'Registrar' };
+    case 'before': return TODAY >= lhDate ? { ic: '🧪', t: 'Faça o teste de LH hoje', s: `Ovulação estimada em ${sd(c.ov)}`, cta: 'Registrar teste' } : { ic: '📅', t: `Teste de LH a partir de ${sd(lhDate)}`, s: `Janela fértil em ${diff(c.win[0], TODAY)} dias`, cta: null };
+    case 'mens': return { ic: '🩸', t: 'Registre o fluxo', s: `Dia ${day} · ${folic ? 'ácido fólico de hoje ✓' : 'não esqueça do ácido fólico'}`, cta: 'Registrar' };
+    case 'wait': return tdays <= 0 ? { ic: '🧾', t: 'Faça o teste de gravidez', s: 'Primeira urina do dia. Já é confiável', cta: 'Registrar teste' } : { ic: '⏳', t: `Espere ${tdays} dia${tdays > 1 ? 's' : ''} para testar`, s: `Teste a partir de ${sd(c.testDate)}: antes pode dar falso negativo`, cta: null };
+    case 'late': return { ic: '🧾', t: 'Faça o teste de gravidez', s: pc?.hasNeg ? `Último negativo em ${sd(pc.lastNeg)}` : 'Primeira urina do dia', cta: 'Registrar teste' };
+    default: return { ic: '🧪', t: 'Faça o teste de LH', s: 'Ele mostra quando você ovula', cta: 'Registrar teste' };
+  }
+}
+function nextStepCard(A, c, pc) {
+  const n = nextStep(A, c, pc);
+  return `<div class="nstep"><span class="nsi">${n.ic}</span><span class="nst"><small>Próximo passo</small><b>${n.t}</b><em>${n.s}</em></span>${n.cta ? `<button class="chip on" data-act="log" data-d="${TODAY}">${n.cta}</button>` : ''}</div>`;
+}
+function tryDaysCard(c) {
+  if (!c.win || c.st === 'late' || TODAY > add(c.win[1], 2)) return '';
+  const days = [], bestSet = new Set();
+  for (let d = c.win[0]; d <= c.win[1]; d = add(d, 1)) days.push(d);
+  for (let d = c.best[0]; d <= c.best[1]; d = add(d, 1)) bestSet.add(d);
+  const nb = [...bestSet].filter(sexOn).length;
+  return `<section class="card tdc"><header><h2>Dias para tentar</h2><span>${nb} de ${bestSet.size} melhores dias</span></header><div class="tds">${days.map(d => `<button class="td ${bestSet.has(d) ? 'best' : ''} ${sexOn(d) ? 'done' : ''} ${d === TODAY ? 'now' : ''} ${d > TODAY ? 'fut' : ''}" data-act="log" data-d="${d}"><small>${WD[D(d).getDay()]}</small><b>${D(d).getDate()}</b><i>${sexOn(d) ? '✓' : bestSet.has(d) ? '★' : ''}</i></button>`).join('')}</div><p class="note" style="margin:8px 0 0">★ melhores dias · ✓ relação registrada</p></section>`;
+}
+function waitCard(c) {
+  if (!c.ov || !['wait', 'late'].includes(c.st)) return '';
+  const dpo = diff(TODAY, c.ov);
+  if (dpo < 0) return '';
+  const pct = Math.min(dpo / 14, 1) * 100;
+  const msg = dpo < 6 ? 'Se houve fecundação, o embrião ainda está a caminho do útero. Não há como saber agora.' : dpo <= 12 ? 'Janela de implantação: pode haver um escape rosado leve e cólica fraca. Sintomas ainda não são confiáveis.' : dpo <= 16 ? 'Já dá para testar: um teste de hoje costuma ser confiável.' : 'Passou da duração habitual da fase lútea (12–14 dias). Faça o teste.';
+  return `<section class="card tww"><header><h2>Espera do teste</h2><span>dia ${dpo} depois da ovulação</span></header><div class="tbar"><i style="width:${pct}%"></i><u style="left:${6 / 14 * 100}%"></u><u style="left:${12 / 14 * 100}%"></u></div><div class="tlab"><span>ovulação</span><span>implantação</span><span>teste</span></div><p style="margin:8px 0 0;font-size:14px">${msg}</p></section>`;
+}
+function partnerText(A) {
+  const c = conceiveInfo(A), f = c.f;
+  return `🌱 Meu ciclo hoje (${fmt(TODAY, { day: 'numeric', month: 'long' })})\nDia ${c.day} do ciclo\n${c.win ? `Janela fértil: ${sr(c.win[0], c.win[1])}\nMelhores dias: ${sr(c.best[0], c.best[1])}\n` : ''}${c.ov ? `Ovulação ${c.e ? c.e.level : 'estimada'}: ${sd(c.ov)}\n` : ''}Chance hoje: ${f?.level || '—'}\nTeste de gravidez: a partir de ${sd(c.testDate)}`;
+}
+function planHeader(A) {
+  const done = CHECK_E.filter((_, i) => S.settings.checklist['e' + i]).length, tot = CHECK_E.length, R = 30, C = 2 * Math.PI * R;
+  const fol = d => (S.logs[d]?.meds || []).includes('Ácido fólico');
+  let streak = 0, d0 = fol(TODAY) ? TODAY : add(TODAY, -1);
+  for (let d = d0; fol(d); d = add(d, -1)) streak++;
+  const dots = [6, 5, 4, 3, 2, 1, 0].map(i => `<i class="${fol(add(TODAY, -i)) ? 'on' : ''}"></i>`).join('');
+  const since = S.settings.conceiveSince ? A.g.filter(g => g.start >= S.settings.conceiveSince).length : 0;
+  const months = S.settings.conceiveSince ? Math.floor(diff(TODAY, S.settings.conceiveSince) / 30) : 0;
+  const irreg = A.spread != null && A.spread >= 10;
+  return `<div class="card"><h2>Seu progresso</h2><div class="prog"><div class="pr"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="${R}" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="40" cy="40" r="${R}" fill="none" stroke="var(--ac,var(--pink))" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C * done / tot} ${C}" transform="rotate(-90 40 40)"/></svg><b>${done}/${tot}</b><small>preparação</small></div>
+    <div class="pl2"><div class="row"><span>Ácido fólico</span><b>${streak} dia${streak === 1 ? '' : 's'} seguido${streak === 1 ? '' : 's'}</b></div><div class="fdots">${dots}</div><div class="row"><span>Tentando há</span><b>${since ? `${since} ciclo${since > 1 ? 's' : ''}` : months ? `${months} mês(es)` : 'este ciclo'}</b></div></div></div>
+    <p class="note" style="margin:10px 0 0">${irreg ? 'Seus ciclos são irregulares: não precisa esperar 12 meses, converse já com seu ginecologista.' : 'Procure avaliação após 12 meses de tentativas (6 meses se tiver 35 anos ou mais).'}</p>
+    <button class="btn alt" style="margin-top:10px" data-act="sharepartner">Compartilhar com o parceiro</button></div>`;
+}
+
 function vHojeConceive(A, last) {
   const c = conceiveInfo(A), { day, F, f, win, best, ov, src, testDate, st, tries } = c, pc = pregCheck(A);
   const over = F.over, tdays = diff(testDate, TODAY), L = S.logs[TODAY] || {};
@@ -421,7 +476,7 @@ function vHojeConceive(A, last) {
     ${cycleStrip(A, last, F, f, day)}</div>
   </section>
   <button class="btn regbtn" data-act="log" data-d="${TODAY}">${S.logs[TODAY] ? '✎ Editar registro de hoje' : '＋ Registrar hoje'}</button>
-  ${cpTile(cm)}${insightsCard(ins)}
+  ${nextStepCard(A, c, pc)}${waitCard(c)}${tryDaysCard(c)}${cpTile(cm)}${insightsCard(ins)}
   <div class="tiles4">
     <button class="tile" data-act="info" data-k="c_win"><small>Janela fértil</small><b>${win ? sr(win[0], win[1]) : '—'}</b><em>${src || 'sem estimativa'}</em></button>
     <button class="tile" data-act="info" data-k="c_win"><small>Melhores dias</small><b>${best ? sr(best[0], best[1]) : '—'}</b><em>${ov ? 'ovulação ' + sd(ov) : ''}</em></button>
@@ -429,7 +484,7 @@ function vHojeConceive(A, last) {
     <button class="tile" data-act="info" data-k="c_test"><small>Teste de gravidez</small><b>${st === 'late' ? 'Agora' : sd(testDate)}</b><em>${st === 'late' ? 'ciclo atrasado' : tdays > 0 ? `em ${tdays} dias` : 'já pode'}</em></button>
   </div>
   <button class="wide" data-act="info" data-k="c_tries"><span>Tentativas na janela</span><b>${tries}</b></button>
-  <p class="tip">💡 ${H[3]}</p>
+  <button class="chip" data-act="sharepartner" style="margin:10px 0 0">Compartilhar com o parceiro</button>
   ${pregBanner()}
   <p class="fine">Estimativas · confirme com teste de LH e orientação médica</p>`;
 }
@@ -1087,7 +1142,8 @@ function vEng() {
   let tries = 0;
   if (f?.ov) for (let d = add(f.ov, -5); d <= add(f.ov, 1); d = add(d, 1)) if (S.logs[d]?.sex && S.logs[d].sex !== 'Não') tries++;
   const color = f && ['Alta', 'Muito alta'].includes(f.level) ? 'var(--green)' : f?.level === 'Média' ? 'var(--amber)' : 'var(--mute)';
-  return `<h1>Engravidar 🌱</h1>
+  return `<h1>Plano para engravidar 🌱</h1>
+  ${planHeader(A)}
   <div class="card hero"><div class="mute">Chance de gravidez hoje</div><div style="font-size:36px;font-weight:800;color:${color}">${f ? f.level : '—'}</div><p class="mute">${f ? f.txt : ''}.</p>
     ${beyond ? (pc?.hasNeg ? `<p class="mute">Teste negativo em ${fmt(pc.lastNeg)}. ${pc.line}</p>` : `<p style="color:var(--pink);font-weight:700">Ciclo fora do seu padrão — faça um teste de gravidez.</p>`) + `<button class="btn alt" data-go="gest">Positivo? Iniciar acompanhamento</button>` : ''}</div>
   <div class="card"><h2>Plano deste ciclo</h2>${plan}</div>
@@ -1228,6 +1284,12 @@ document.addEventListener('click', e => {
     case 'phase': {
       const [title, html] = phaseSheet(analyze(), t.dataset.k);
       $sheet.className = ''; $sheet.innerHTML = `<h1>${title}</h1>${html}<div style="height:12px"></div><button class="btn alt" data-act="close">Fechar</button>`; $sheet.showModal(); break;
+    }
+    case 'sharepartner': {
+      const txt = partnerText(analyze());
+      const fallback = () => dialog(`<h1>Mensagem para o parceiro</h1><textarea id="bk" rows="8" readonly>${esc(txt)}</textarea><div style="height:8px"></div><button class="btn" data-act="copybk">Copiar mensagem</button><p class="note" id="bkmsg"></p>`);
+      if (navigator.share) navigator.share({ text: txt }).catch(fallback); else fallback();
+      break;
     }
     case 'toggleins': {
       const sec = t.closest('.insc'), o = !sec.classList.contains('open');
