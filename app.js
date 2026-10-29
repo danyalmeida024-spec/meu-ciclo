@@ -806,8 +806,7 @@ function vCal() {
   return `${winCard}<div class="cal-h"><button data-act="prev">‹</button><h1 class="cap" style="margin:0">${title}</h1><button data-act="next">›</button></div>
   <div class="grid ${phOn() ? '' : 'nophase'}" id="calgrid">${cells}</div>
   <button class="chip ${phOn() ? 'on' : ''}" data-act="phtog" style="margin-top:12px">Fases: folicular e lútea</button>
-  ${more('Legenda do calendário', `<div class="legend" style="margin:0">${pg ? `<span><i style="background:var(--pink-l);border:1px solid var(--pink)"></i>Gestação (a partir de ${sd(since)})</span><span>🎀 Parto previsto</span><span><i style="border:2px dotted var(--pink);border-radius:50%"></i>Concepção</span><span>Ns = semana</span>` : ''}<span><i style="background:var(--rose);border-radius:50%"></i>Menstruação</span><span><i style="border:2px dashed var(--rose)"></i>Menstruação prevista</span><span><i style="border:2px dotted var(--rose);opacity:.6"></i>Ciclo seguinte</span><span style="color:var(--teal)"><i style="background:var(--teal)"></i>Janela fértil</span><span><i style="background:var(--violet);height:3px;margin-top:5px"></i>Fase folicular</span><span><i style="background:var(--amber);height:3px;margin-top:5px"></i>Fase lútea</span><span><i style="background:var(--teal);border-radius:50%"></i>Ovulação provável</span><span><i style="border:2px dotted var(--teal);border-radius:50%"></i>Ovulação prevista</span><span><i style="background:#4d5a75;border-radius:50%"></i>Atraso</span><span style="color:var(--rose)">♥ Sexo</span><span>● Outro registro</span><span>💊 Pílula</span><span><i style="background:var(--rose);border-radius:50%;opacity:.7;width:7px;height:7px"></i>Escape</span></div>`, '', '🎨')}`;
-}
+  ${more('Legenda do calendário', `<div class="lgrid">${pg ? `<span class="lgi"><b class="lg lg-pg">12</b>Gestação (a partir de ${sd(since)})</span><span class="lgi"><b class="lg lg-conc">12</b>Concepção</span><span class="lgi"><b class="lg">🎀</b>Parto previsto</span>` : ''}<span class="lgi"><b class="lg lg-per">12</b>Menstruação</span><span class="lgi"><b class="lg lg-pper">12</b>Menstruação prevista</span><span class="lgi"><b class="lg lg-pper2">12</b>Menstruação do ciclo seguinte</span><span class="lgi"><b class="lg lg-fert">12</b>Janela fértil</span><span class="lgi"><b class="lg lg-ov">12</b>Ovulação provável</span><span class="lgi"><b class="lg lg-ovp">12</b>Ovulação prevista</span><span class="lgi"><b class="lg lg-fol">12</b>Fase folicular (barra roxa)</span><span class="lgi"><b class="lg lg-lut">12</b>Fase lútea (barra amarela)</span><span class="lgi"><b class="lg lg-late">12</b>Atraso</span><span class="lgi"><b class="lg lg-x" style="color:#e8456b">♥</b>Sexo sem proteção</span><span class="lgi"><b class="lg lg-x">●</b>Outro registro</span><span class="lgi"><b class="lg lg-x">💊</b>Pílula</span></div>`, '', '🎨')}`;}
 
 function barChart(vals, a) {
   const W = 340, H = 140, p = 24, mx = Math.max(...vals, a) + 4, mn = Math.min(...vals, a) - 8, bw = (W - p * 2) / vals.length;
@@ -885,19 +884,19 @@ function forecastCards(A) {
   const row = (c, l, v, sub = '') => `<div class="frow">${dot(c)}<span>${l}${sub ? `<small>${sub}</small>` : ''}</span><b>${v}</b></div>`;
   const day = diff(TODAY, last.start) + 1;
   const curCard = cur ? `<div class="card"><h2>Ciclo atual · dia ${day}</h2>
-    ${row('var(--rose)', 'Menstruação', `${sd(cur.start)} a ${sd(cur.end)}`)}
-    ${row('var(--violet)', 'Folicular', rg(...cur.fol))}
-    ${row('var(--teal)', 'Janela fértil', rg(...cur.fert))}
-    ${row('var(--teal)', 'Ovulação', sd(cur.ov), cur.evid ? `${cur.level} · ${cur.src.join(' + ')}` : 'estimada pelos seus ciclos')}
-    ${row('var(--amber)', 'Lútea', rg(...cur.lut), `${diff(cur.lut[1], cur.lut[0]) + 1} dias`)}
-    ${row('var(--rose)', 'Menstruação prevista', cur.nobase ? '—' : rg(cur.mens[0], cur.mens[1]), cur.late ? 'já atrasada' : cur.nobase ? '' : `provável ${sd(cur.center)}`)}</div>` : '';
+    ${row('var(--c-mens)', 'Menstruação', `${sd(cur.start)} a ${sd(cur.end)}`)}
+    ${row('var(--c-fol)', 'Folicular', rg(...cur.fol))}
+    ${row('var(--c-fert)', 'Janela fértil', rg(...cur.fert))}
+    ${row('var(--c-ov)', 'Ovulação', sd(cur.ov), cur.evid ? `${cur.level} · ${cur.src.join(' + ')}` : 'estimada pelos seus ciclos')}
+    ${row('var(--c-lut)', 'Lútea', rg(...cur.lut), `${diff(cur.lut[1], cur.lut[0]) + 1} dias`)}
+    ${row('var(--c-mens)', 'Menstruação prevista', cur.nobase ? '—' : rg(cur.mens[0], cur.mens[1]), cur.late ? 'já atrasada' : cur.nobase ? '' : `provável ${sd(cur.center)}`)}</div>` : '';
   const nextCard = next ? `<div class="card"><h2>Próximo ciclo (previsão)</h2>
-    ${row('var(--rose)', 'Menstruação', rg(...next.mens), 'se vier em breve')}
-    ${row('var(--violet)', 'Folicular', rg(...next.fol))}
-    ${row('var(--teal)', 'Janela fértil', rg(...next.fert))}
-    ${row('var(--teal)', 'Ovulação', sd(next.ov), `entre ${sd(next.ovRange[0])} e ${sd(next.ovRange[1])}`)}
-    ${row('var(--amber)', 'Lútea', rg(...next.lut), `${A.luteal} dias`)}
-    ${row('var(--rose)', 'Menstruação seguinte', `~${sd(next.nextStart)}`)}
+    ${row('var(--c-mens)', 'Menstruação', rg(...next.mens), 'se vier em breve')}
+    ${row('var(--c-fol)', 'Folicular', rg(...next.fol))}
+    ${row('var(--c-fert)', 'Janela fértil', rg(...next.fert))}
+    ${row('var(--c-ov)', 'Ovulação', sd(next.ov), `entre ${sd(next.ovRange[0])} e ${sd(next.ovRange[1])}`)}
+    ${row('var(--c-lut)', 'Lútea', rg(...next.lut), `${A.luteal} dias`)}
+    ${row('var(--c-next)', 'Menstruação seguinte', `~${sd(next.nextStart)}`)}
     <p class="note">Calculado a partir dos seus ciclos anteriores (${A.n} registrados, de ${A.min ?? '—'} a ${A.max ?? '—'} dias) e do cenário atual. Quanto mais sinais você registrar, mais exata fica.</p></div>` : '';
   return curCard + nextCard;
 }
@@ -960,7 +959,7 @@ function vCfg() {
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
     <button class="btn danger" data-act="wipe">Apagar tudo</button></div>
-  <p class="fine">Meu Ciclo · versão 38</p>`;
+  <p class="fine">Meu Ciclo · versão 39</p>`;
 }
 
 function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }
