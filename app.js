@@ -868,7 +868,8 @@ function vCfg() {
   <div class="card"><h2>Dados</h2><p class="note">Tudo fica só neste aparelho. Faça backup de vez em quando.</p>
     <button class="btn alt" data-act="export">Exportar backup (.json)</button><div style="height:8px"></div>
     <button class="btn alt" data-act="import">Importar backup</button><div style="height:8px"></div>
-    <button class="btn danger" data-act="wipe">Apagar tudo</button></div>`;
+    <button class="btn danger" data-act="wipe">Apagar tudo</button></div>
+  <p class="fine">Meu Ciclo · versão 35</p>`;
 }
 
 function applyGoal() { if (goalOf() === 'conceive') document.documentElement.dataset.goal = 'conceive'; else delete document.documentElement.dataset.goal; }

@@ -1,4 +1,4 @@
-const V = 'ciclo-v5';
+const V = 'ciclo-v6';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'baby3d.js', 'vendor/three.module.min.js'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(V).then(c => c.addAll(ASSETS.map(a => new Request(a, { cache: 'reload' }))))); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())));
