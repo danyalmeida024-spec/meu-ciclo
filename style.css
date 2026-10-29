@@ -347,3 +347,10 @@ h4.ph{margin:16px 0 6px;font-size:12px;color:var(--pink);text-transform:uppercas
 .alertbox{margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--rose-l);font-size:13px}.alertbox ul{margin:6px 0 0;padding-left:18px}
 .ch.rec{box-shadow:inset 0 0 0 1.5px var(--c,var(--pink))}
 .card>.sw{width:100%;justify-content:space-between}
+
+.d.pg{background:var(--pink-l) !important;color:var(--pink);border-radius:12px !important}
+.d.pg.conc{border:2px dotted var(--pink)}
+.d.pg.dpp{background:var(--pink) !important;color:#fff;font-weight:800}
+.d.pg.today{background:linear-gradient(135deg,#a98bff,var(--pink)) !important;color:#fff}
+.d .wkm{position:absolute;top:3px;left:0;right:0;text-align:center;font-style:normal;font-size:8px;font-weight:800;opacity:.75}
+.pred.p3{background:linear-gradient(145deg,#ff7aa8,#8a3fd1)}
